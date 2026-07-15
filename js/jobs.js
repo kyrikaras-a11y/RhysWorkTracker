@@ -205,12 +205,21 @@ function renderJobDetail(job) {
 
     <div class="card">
       <h3>Job Costs</h3>
-      <p style="margin-top:4px">Auto-filled from Expenses/Contractors in later stages — editable manually for now.</p>
-      <div class="field-row">
-        <div class="field"><label>Materials ($)</label><input id="cost-materials" type="number" step="0.01" value="${job['Materials Cost'] || 0}" /></div>
-        <div class="field"><label>Contractors ($)</label><input id="cost-contractor" type="number" step="0.01" value="${job['Contractor Cost'] || 0}" /></div>
-      </div>
-      <div class="field"><label>Other Costs ($)</label><input id="cost-other" type="number" step="0.01" value="${job['Other Job Costs'] || 0}" /></div>
+      <p style="margin-top:4px">Materials & Contractor costs total from Expenses tagged to this job, plus any manual top-up below — handy if you don't want every cost itemised as a formal expense.</p>
+
+      <div class="card-row"><span class="label">Materials — from Expenses</span><span class="value">${money((parseFloat(job['Materials Cost']) || 0) - (parseFloat(job['Materials Cost Manual']) || 0))}</span></div>
+      <div class="field"><label>Materials — manual top-up ($)</label><input id="cost-materials-manual" type="number" step="0.01" value="${job['Materials Cost Manual'] || 0}" /></div>
+      <div class="card-row" style="border-top:1px solid var(--border);margin-top:4px"><span class="label" style="font-weight:700">Total Materials Cost</span><span class="value">${money(job['Materials Cost'])}</span></div>
+
+      <div style="height:14px"></div>
+
+      <div class="card-row"><span class="label">Contractors — from Expenses</span><span class="value">${money((parseFloat(job['Contractor Cost']) || 0) - (parseFloat(job['Contractor Cost Manual']) || 0))}</span></div>
+      <div class="field"><label>Contractors — manual top-up ($)</label><input id="cost-contractor-manual" type="number" step="0.01" value="${job['Contractor Cost Manual'] || 0}" /></div>
+      <div class="card-row" style="border-top:1px solid var(--border);margin-top:4px"><span class="label" style="font-weight:700">Total Contractor Cost</span><span class="value">${money(job['Contractor Cost'])}</span></div>
+
+      <div style="height:14px"></div>
+      <div class="field"><label>Other Costs ($) <span style="font-weight:400;text-transform:none">— for anything else not logged as an Expense</span></label><input id="cost-other" type="number" step="0.01" value="${job['Other Job Costs'] || 0}" /></div>
+
       <button class="btn btn-secondary btn-block" id="save-costs-btn">Save Costs</button>
       <div class="card-row" style="margin-top:10px">
         <span class="label">Job Profit</span>
@@ -285,8 +294,8 @@ function wireJobDetail(job) {
     try {
       await Api.post('updateJob', {
         jobId: job['Job ID'],
-        materialsCost: document.getElementById('cost-materials').value,
-        contractorCost: document.getElementById('cost-contractor').value,
+        materialsCostManual: document.getElementById('cost-materials-manual').value,
+        contractorCostManual: document.getElementById('cost-contractor-manual').value,
         otherJobCosts: document.getElementById('cost-other').value
       });
       Toast.show('Costs saved');
