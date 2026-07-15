@@ -126,6 +126,7 @@ function showAddCustomerForm() {
       <div class="field"><label>Email</label><input name="email" type="email" /></div>
       <div class="field"><label>Billing Address</label><textarea name="billingAddress"></textarea></div>
       <div class="field"><label>Job Address</label><textarea name="jobAddress"></textarea></div>
+      <div class="field"><label>Hourly Rate ($) <span style="font-weight:400;text-transform:none">— used to prefill timesheets for this customer</span></label><input name="hourlyRate" type="number" step="0.01" placeholder="Leave blank to use your default rate" /></div>
       <div class="field"><label>Notes</label><textarea name="notes"></textarea></div>
       <button class="btn btn-primary btn-block" type="submit">Save Customer</button>
       <div style="height:10px"></div>
@@ -156,10 +157,16 @@ function stubPage(title, stage) {
     </div>
   `;
 }
-Router.register('jobs', async () => stubPage('Jobs & Invoices', 2));
+Router.register('jobs', async () => {
+  let jobs = [];
+  try { jobs = await Api.get('getJobs'); } catch (e) {}
+  window._jobsCache = jobs;
+  return renderJobsList(jobs, 'All');
+});
 Router.register('expenses', async () => stubPage('Expenses', 3));
 Router.register('more', async () => `
   <h1>More</h1>
+  <div class="card" onclick="navigateAndWire('timesheets')"><div class="card-row"><span class="label">🕒 Timesheets</span><span>→</span></div></div>
   <div class="card" onclick="navigateAndWire('settings')"><div class="card-row"><span class="label">⚙️ Settings (connect your Apps Script)</span><span>→</span></div></div>
   <div class="card" onclick="Router.go('subcontractors')"><div class="card-row"><span class="label">Subcontractors</span><span>Stage 5 →</span></div></div>
   <div class="card" onclick="Router.go('assets')"><div class="card-row"><span class="label">Assets Register</span><span>Stage 5 →</span></div></div>
@@ -256,6 +263,8 @@ async function navigateAndWire(route) {
   await Router.go(route);
   if (route === 'customers') wireCustomerPage();
   if (route === 'settings') wireSettingsPage();
+  if (route === 'jobs') wireJobsListPage();
+  if (route === 'timesheets') wireTimesheetsPage();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
