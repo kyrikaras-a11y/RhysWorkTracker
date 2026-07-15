@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trades-app-shell-v10';
+const CACHE_NAME = 'trades-app-shell-v12';
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const APP_SHELL = [
   './js/api.js',
   './js/jobs.js',
   './js/timesheets.js',
+  './js/expenses.js',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
