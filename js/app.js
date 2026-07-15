@@ -224,7 +224,6 @@ Router.register('jobs', async () => {
 Router.register('expenses', async () => stubPage('Expenses', 3));
 Router.register('more', async () => `
   <h1>More</h1>
-  <div class="card" onclick="navigateAndWire('timesheets')"><div class="card-row"><span class="label">🕒 Timesheets</span><span>→</span></div></div>
   <div class="card" onclick="navigateAndWire('settings')"><div class="card-row"><span class="label">⚙️ Settings (connect your Apps Script)</span><span>→</span></div></div>
   <div class="card" onclick="Router.go('contractors')"><div class="card-row"><span class="label">Contractors</span><span>Stage 5 →</span></div></div>
   <div class="card" onclick="Router.go('assets')"><div class="card-row"><span class="label">Assets Register</span><span>Stage 5 →</span></div></div>
