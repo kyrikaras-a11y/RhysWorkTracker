@@ -264,6 +264,7 @@ Router.register('settings', async () => {
         <div class="field"><label>Email</label><input id="s-email" value="${escapeHtml(settings['Email'] || '')}" /></div>
       </div>
       <div class="field"><label>Default GST Rate</label><input id="s-gst" value="${escapeHtml(settings['Default GST Rate'] || '0.10')}" /></div>
+      <div class="field"><label>Default Hourly Rate ($)</label><input id="s-hourly-rate" type="number" step="0.01" value="${escapeHtml(settings['Default Hourly Rate'] || '65')}" /></div>
       <button class="btn btn-primary btn-block" id="save-settings-btn">Save Business Details</button>
     </div>
 
@@ -297,7 +298,8 @@ function wireSettingsPage() {
         'Address': document.getElementById('s-address').value,
         'Phone': document.getElementById('s-phone').value,
         'Email': document.getElementById('s-email').value,
-        'Default GST Rate': document.getElementById('s-gst').value
+        'Default GST Rate': document.getElementById('s-gst').value,
+        'Default Hourly Rate': document.getElementById('s-hourly-rate').value
       };
       try {
         await Api.post('saveSettings', payload);
