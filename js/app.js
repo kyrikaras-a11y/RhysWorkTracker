@@ -221,7 +221,6 @@ Router.register('jobs', async () => {
   window._jobsCache = jobs;
   return renderJobsList(jobs, 'All');
 });
-Router.register('expenses', async () => stubPage('Expenses', 3));
 Router.register('more', async () => `
   <h1>More</h1>
   <div class="card" onclick="navigateAndWire('settings')"><div class="card-row"><span class="label">⚙️ Settings (connect your Apps Script)</span><span>→</span></div></div>
@@ -324,6 +323,7 @@ async function navigateAndWire(route) {
   if (route === 'settings') wireSettingsPage();
   if (route === 'jobs') wireJobsListPage();
   if (route === 'timesheets') wireTimesheetsPage();
+  if (route === 'expenses') wireExpensesPage();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
