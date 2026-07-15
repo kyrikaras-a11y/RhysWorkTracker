@@ -78,9 +78,10 @@ Router.register('dashboard', async () => {
 Router.register('customers', async () => {
   let customers = [];
   try { customers = await Api.get('getCustomers'); } catch (e) { /* not connected yet */ }
+  window._customersCache = customers;
 
   const rows = customers.map(c => `
-    <div class="list-item">
+    <div class="list-item" data-customer-id="${escapeHtml(c['Customer ID'])}">
       <div class="li-main">
         <div class="li-title">${escapeHtml(c['Customer Name'] || c['Business Name'] || 'Unnamed')}</div>
         <div class="li-sub">${escapeHtml(c['Phone'] || c['Email'] || '')}</div>
@@ -112,6 +113,12 @@ function wireCustomerPage() {
       });
     });
   }
+  document.querySelectorAll('#customer-list .list-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const customer = (window._customersCache || []).find(c => c['Customer ID'] === item.dataset.customerId);
+      if (customer) showEditCustomerForm(customer);
+    });
+  });
   const fab = document.getElementById('add-customer-fab');
   if (fab) fab.addEventListener('click', showAddCustomerForm);
 }
@@ -141,6 +148,57 @@ function showAddCustomerForm() {
       await Api.post('createCustomer', data);
       Toast.show('Customer saved');
       Router.go('customers');
+    } catch (err) {
+      Toast.show('Error: ' + err.message);
+    }
+  });
+}
+
+function showEditCustomerForm(customer) {
+  document.getElementById('page-container').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <button class="icon-btn" id="back-to-customers">←</button>
+      <h1 style="margin:0">Edit Customer</h1>
+    </div>
+    <form id="customer-edit-form">
+      <div class="field"><label>Customer Name</label><input name="customerName" value="${escapeHtml(customer['Customer Name'] || '')}" required /></div>
+      <div class="field"><label>Business Name</label><input name="businessName" value="${escapeHtml(customer['Business Name'] || '')}" /></div>
+      <div class="field"><label>Contact Person</label><input name="contactPerson" value="${escapeHtml(customer['Contact Person'] || '')}" /></div>
+      <div class="field"><label>Phone</label><input name="phone" type="tel" value="${escapeHtml(customer['Phone'] || '')}" /></div>
+      <div class="field"><label>Email</label><input name="email" type="email" value="${escapeHtml(customer['Email'] || '')}" /></div>
+      <div class="field"><label>Billing Address</label><textarea name="billingAddress">${escapeHtml(customer['Billing Address'] || '')}</textarea></div>
+      <div class="field"><label>Job Address</label><textarea name="jobAddress">${escapeHtml(customer['Job Address'] || '')}</textarea></div>
+      <div class="field"><label>Hourly Rate ($) <span style="font-weight:400;text-transform:none">— used to prefill timesheets for this customer</span></label><input name="hourlyRate" type="number" step="0.01" value="${customer['Hourly Rate'] !== undefined && customer['Hourly Rate'] !== '' ? customer['Hourly Rate'] : ''}" placeholder="Leave blank to use your default rate" /></div>
+      <div class="field"><label>Notes</label><textarea name="notes">${escapeHtml(customer['Notes'] || '')}</textarea></div>
+      <button class="btn btn-primary btn-block" type="submit">Save Changes</button>
+      <div style="height:10px"></div>
+      <button class="btn btn-danger btn-block" type="button" id="delete-customer-btn">Delete Customer</button>
+      <div style="height:10px"></div>
+      <button class="btn btn-secondary btn-block" type="button" id="cancel-edit-btn">Cancel</button>
+    </form>
+  `;
+  document.getElementById('back-to-customers').addEventListener('click', () => navigateAndWire('customers'));
+  document.getElementById('cancel-edit-btn').addEventListener('click', () => navigateAndWire('customers'));
+
+  document.getElementById('delete-customer-btn').addEventListener('click', async () => {
+    if (!confirm(`Delete ${customer['Customer Name']}? This cannot be undone. Existing jobs will keep this customer's name but the link will be lost.`)) return;
+    try {
+      await Api.post('deleteCustomer', { customerId: customer['Customer ID'] });
+      Toast.show('Customer deleted');
+      navigateAndWire('customers');
+    } catch (err) {
+      Toast.show('Error: ' + err.message);
+    }
+  });
+
+  document.getElementById('customer-edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    data.customerId = customer['Customer ID'];
+    try {
+      await Api.post('updateCustomer', data);
+      Toast.show('Customer updated');
+      navigateAndWire('customers');
     } catch (err) {
       Toast.show('Error: ' + err.message);
     }
