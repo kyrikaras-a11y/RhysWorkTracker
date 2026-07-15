@@ -205,10 +205,10 @@ function renderJobDetail(job) {
 
     <div class="card">
       <h3>Job Costs</h3>
-      <p style="margin-top:4px">Auto-filled from Expenses/Subcontractors in later stages — editable manually for now.</p>
+      <p style="margin-top:4px">Auto-filled from Expenses/Contractors in later stages — editable manually for now.</p>
       <div class="field-row">
         <div class="field"><label>Materials ($)</label><input id="cost-materials" type="number" step="0.01" value="${job['Materials Cost'] || 0}" /></div>
-        <div class="field"><label>Subcontractors ($)</label><input id="cost-subcontractor" type="number" step="0.01" value="${job['Subcontractor Cost'] || 0}" /></div>
+        <div class="field"><label>Contractors ($)</label><input id="cost-contractor" type="number" step="0.01" value="${job['Contractor Cost'] || 0}" /></div>
       </div>
       <div class="field"><label>Other Costs ($)</label><input id="cost-other" type="number" step="0.01" value="${job['Other Job Costs'] || 0}" /></div>
       <button class="btn btn-secondary btn-block" id="save-costs-btn">Save Costs</button>
@@ -286,7 +286,7 @@ function wireJobDetail(job) {
       await Api.post('updateJob', {
         jobId: job['Job ID'],
         materialsCost: document.getElementById('cost-materials').value,
-        subcontractorCost: document.getElementById('cost-subcontractor').value,
+        contractorCost: document.getElementById('cost-contractor').value,
         otherJobCosts: document.getElementById('cost-other').value
       });
       Toast.show('Costs saved');
