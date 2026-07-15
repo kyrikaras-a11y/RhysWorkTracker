@@ -2,7 +2,7 @@
  * app.js
  * Stage 1: app shell, routing, theme toggle, connection setup,
  * and a working Customers module as the reference pattern.
- * Jobs / Invoices / Expenses / Subcontractors / Assets / GST / EOFY
+ * Jobs / Invoices / Expenses / Contractors / Assets / GST / EOFY
  * screens arrive in later stages and are stubbed as "coming soon" here.
  */
 
@@ -226,12 +226,12 @@ Router.register('more', async () => `
   <h1>More</h1>
   <div class="card" onclick="navigateAndWire('timesheets')"><div class="card-row"><span class="label">🕒 Timesheets</span><span>→</span></div></div>
   <div class="card" onclick="navigateAndWire('settings')"><div class="card-row"><span class="label">⚙️ Settings (connect your Apps Script)</span><span>→</span></div></div>
-  <div class="card" onclick="Router.go('subcontractors')"><div class="card-row"><span class="label">Subcontractors</span><span>Stage 5 →</span></div></div>
+  <div class="card" onclick="Router.go('contractors')"><div class="card-row"><span class="label">Contractors</span><span>Stage 5 →</span></div></div>
   <div class="card" onclick="Router.go('assets')"><div class="card-row"><span class="label">Assets Register</span><span>Stage 5 →</span></div></div>
   <div class="card" onclick="Router.go('gst')"><div class="card-row"><span class="label">GST Summary</span><span>Stage 5 →</span></div></div>
   <div class="card" onclick="Router.go('eofy')"><div class="card-row"><span class="label">EOFY Reports</span><span>Stage 7 →</span></div></div>
 `);
-Router.register('subcontractors', async () => stubPage('Subcontractors', 5));
+Router.register('contractors', async () => stubPage('Contractors', 5));
 Router.register('assets', async () => stubPage('Assets Register', 5));
 Router.register('gst', async () => stubPage('GST Summary', 5));
 Router.register('eofy', async () => stubPage('EOFY Reports', 7));
