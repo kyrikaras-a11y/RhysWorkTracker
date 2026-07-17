@@ -304,3 +304,101 @@ function compressImageToBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// ---------- Picker used from Job Detail to add expenses to an invoice ----------
+// (formatDate / formatDateForInput are defined globally in jobs.js / timesheets.js,
+// both of which load before this file — see index.html script order.)
+
+async function showExpensePickerForInvoice(jobId) {
+  let entries = [];
+  try { entries = await Api.get('getUnbilledExpensesForJob', { jobId }); } catch (e) {}
+
+  if (!entries.length) {
+    document.getElementById('page-container').innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <button class="icon-btn" id="back-to-job-exp">←</button>
+        <h1 style="margin:0">Add from Expenses</h1>
+      </div>
+      <div class="empty-state">No unbilled expenses linked to this job.<br>Tag an expense with this job in the Expenses tab first.</div>
+    `;
+    document.getElementById('back-to-job-exp').addEventListener('click', () => showJobDetail(jobId));
+    return;
+  }
+
+  const totalAmount = entries.reduce((s, e) => s + (parseFloat(e['Amount Ex GST']) || 0), 0);
+
+  const rows = entries.map(e => `
+    <div class="list-item">
+      <label style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer">
+        <input type="checkbox" class="exp-pick" data-exp-id="${escapeHtml(e['Expense ID'])}" data-amount="${e['Amount Ex GST']}" data-desc="${escapeHtml(e['Description'] || e['Supplier'] || 'Materials')}" data-date="${formatDate(e['Date'])}" checked style="width:20px;height:20px" />
+        <div class="li-main" style="flex:1">
+          <div class="li-title">${formatDate(e['Date'])} — ${expMoney(e['Amount Ex GST'])}</div>
+          <div class="li-sub">${escapeHtml(e['Category'])} · ${escapeHtml(e['Supplier'] || '')} · ${escapeHtml(e['Description'] || '')}</div>
+        </div>
+      </label>
+    </div>
+  `).join('');
+
+  document.getElementById('page-container').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <button class="icon-btn" id="back-to-job-exp">←</button>
+      <h1 style="margin:0">Add from Expenses</h1>
+    </div>
+    <div class="card">${rows}</div>
+
+    <div class="card">
+      <h3>How should this appear on the invoice?</h3>
+      <div class="field">
+        <label><input type="radio" name="exp-mode" value="breakdown" checked /> Show each expense as its own line</label>
+      </div>
+      <div class="field">
+        <label><input type="radio" name="exp-mode" value="lumpsum" /> Lump sum total only (no itemised detail)</label>
+      </div>
+      <div id="exp-lumpsum-fields" style="display:none">
+        <div class="field"><label>Line description</label><input id="exp-lumpsum-desc" value="Materials" /></div>
+        <div class="field"><label>Total amount ($)</label><input id="exp-lumpsum-amount" type="number" step="0.01" value="${totalAmount.toFixed(2)}" /></div>
+        <p>Suggested total is the sum of selected expenses (excl. GST). Edit freely — e.g. add a markup, or enter a rounder figure.</p>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-block" id="add-selected-exp-btn">Add to Invoice</button>
+    <div style="height:10px"></div>
+    <button class="btn btn-secondary btn-block" id="cancel-exp-picker-btn">Cancel</button>
+  `;
+
+  document.getElementById('back-to-job-exp').addEventListener('click', () => showJobDetail(jobId));
+  document.getElementById('cancel-exp-picker-btn').addEventListener('click', () => showJobDetail(jobId));
+
+  document.querySelectorAll('input[name="exp-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.getElementById('exp-lumpsum-fields').style.display =
+        document.querySelector('input[name="exp-mode"]:checked').value === 'lumpsum' ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('add-selected-exp-btn').addEventListener('click', () => {
+    const checked = Array.from(document.querySelectorAll('.exp-pick:checked'));
+    if (!checked.length) { Toast.show('Select at least one expense'); return; }
+    const mode = document.querySelector('input[name="exp-mode"]:checked').value;
+    const expenseIds = checked.map(c => c.dataset.expId);
+
+    let pendingLines;
+    if (mode === 'breakdown') {
+      pendingLines = checked.map(c => ({
+        description: `${c.dataset.date} — ${c.dataset.desc}`,
+        quantity: 1,
+        unitPrice: c.dataset.amount
+      }));
+    } else {
+      pendingLines = [{
+        description: document.getElementById('exp-lumpsum-desc').value || 'Materials',
+        quantity: 1,
+        unitPrice: document.getElementById('exp-lumpsum-amount').value
+      }];
+    }
+
+    window._pendingExpenseLines = pendingLines;
+    window._pendingExpenseIds = expenseIds;
+    showJobDetail(jobId);
+  });
+}
