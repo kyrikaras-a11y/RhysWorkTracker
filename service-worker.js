@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trades-app-shell-v13';
+const CACHE_NAME = 'trades-app-shell-v15';
 const APP_SHELL = [
   './',
   './index.html',
