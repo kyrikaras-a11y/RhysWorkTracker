@@ -176,7 +176,7 @@ async function showTimesheetForm(entry, prefillDate) {
 
   const isInvoiced = entry && (entry['Invoiced'] === true || entry['Invoiced'] === 'TRUE');
   const jobOptions = jobs.map(j =>
-    `<option value="${escapeHtml(j['Job ID'])}" ${entry && entry['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(j['Customer Name'])} — ${escapeHtml(j['Job ID'])}</option>`
+    `<option value="${escapeHtml(j['Job ID'])}" ${entry && entry['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(jobDropdownLabel(j))}</option>`
   ).join('');
 
   let defaultRate = 65;
