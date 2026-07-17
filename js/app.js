@@ -207,10 +207,8 @@ Router.register('more', async () => `
   <div class="card" onclick="navigateAndWire('contractors')"><div class="card-row"><span class="label">🧑‍🔧 Contractors</span><span>→</span></div></div>
   <div class="card" onclick="navigateAndWire('assets')"><div class="card-row"><span class="label">🧰 Assets Register</span><span>→</span></div></div>
   <div class="card" onclick="navigateAndWire('gst')"><div class="card-row"><span class="label">📋 GST Summary</span><span>→</span></div></div>
-  <div class="card" onclick="Router.go('eofy')"><div class="card-row"><span class="label">EOFY Reports</span><span>Stage 7 →</span></div></div>
+  <div class="card" onclick="navigateAndWire('eofy')"><div class="card-row"><span class="label">📑 EOFY Reports</span><span>→</span></div></div>
 `);
-Router.register('eofy', async () => stubPage('EOFY Reports', 7));
-
 // ---------- Settings ----------
 Router.register('settings', async () => {
   const apiUrl = Api.getBaseUrl();
@@ -305,6 +303,7 @@ async function navigateAndWire(route) {
   if (route === 'assets') wireAssetsPage();
   if (route === 'gst') wireGstPage();
   if (route === 'dashboard') wireDashboardPage();
+  if (route === 'eofy') wireEofyPage();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
