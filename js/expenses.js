@@ -387,18 +387,21 @@ async function showExpensePickerForInvoice(jobId) {
       pendingLines = checked.map(c => ({
         description: `${c.dataset.date} — ${c.dataset.desc}`,
         quantity: 1,
-        unitPrice: c.dataset.amount
+        unitPrice: c.dataset.amount,
+        sourceType: 'Expense',
+        sourceId: c.dataset.expId
       }));
     } else {
       pendingLines = [{
         description: document.getElementById('exp-lumpsum-desc').value || 'Materials',
         quantity: 1,
-        unitPrice: document.getElementById('exp-lumpsum-amount').value
+        unitPrice: document.getElementById('exp-lumpsum-amount').value,
+        sourceType: 'Expense',
+        sourceId: expenseIds.join(',')
       }];
     }
 
     window._pendingExpenseLines = pendingLines;
-    window._pendingExpenseIds = expenseIds;
     showJobDetail(jobId);
   });
 }
