@@ -74,7 +74,7 @@ html, body {
 }
 
 body {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
   padding-top: env(safe-area-inset-top);
 }
 
@@ -113,7 +113,7 @@ p { margin: 0 0 8px; color: var(--text-muted); }
 .icon-btn:active { transform: scale(0.94); }
 
 /* ---------- Page container ---------- */
-.page { padding: 16px; max-width: 640px; margin: 0 auto; }
+.page { padding: 16px 16px 32px; max-width: 640px; margin: 0 auto; }
 .page.hidden { display: none; }
 
 /* ---------- Cards ---------- */
@@ -181,7 +181,14 @@ p { margin: 0 0 8px; color: var(--text-muted); }
 /* ---------- Forms ---------- */
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
-.field input, .field select, .field textarea {
+.field label:has(input[type="checkbox"]), .field label:has(input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.field input:not([type="checkbox"]):not([type="radio"]), .field select, .field textarea {
   width: 100%;
   min-height: var(--tap);
   padding: 10px 14px;
@@ -191,6 +198,14 @@ p { margin: 0 0 8px; color: var(--text-muted); }
   border-radius: var(--radius-sm);
   color: var(--text);
   font-family: inherit;
+}
+.field input[type="checkbox"], .field input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  margin: 0;
 }
 .field textarea { min-height: 90px; resize: vertical; }
 .field input:focus, .field select:focus, .field textarea:focus {
