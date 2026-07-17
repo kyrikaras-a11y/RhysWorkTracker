@@ -260,7 +260,12 @@ function renderJobDetail(job) {
         <div class="card-row"><span class="label">Remaining Balance</span><span class="value">${money(job['Remaining Balance'])}</span></div>
         <button class="btn btn-primary btn-block" id="record-payment-btn">Record Payment</button>
 
-        <p style="margin-top:14px">PDF generation & emailing arrive in Stage 4.</p>
+        <div style="height:16px"></div>
+        <h3>PDF & Email</h3>
+        ${job['PDF Link'] ? `<div class="card-row"><span class="label">Current PDF</span><span class="value"><a href="${escapeHtml(job['PDF Link'])}" target="_blank">📄 View / Download</a></span></div>` : '<p>No PDF generated yet.</p>'}
+        <button class="btn btn-secondary btn-block" id="generate-pdf-btn">${job['PDF Link'] ? 'Regenerate PDF' : 'Generate PDF'}</button>
+        <div style="height:10px"></div>
+        <button class="btn btn-primary btn-block" id="email-invoice-btn">✉️ Email Invoice to Customer</button>
       ` : `
         <p>No invoice yet.</p>
         <button class="btn btn-primary btn-block" id="generate-invoice-btn">Generate Invoice</button>
@@ -316,6 +321,28 @@ function wireJobDetail(job) {
         Toast.show('Error: ' + err.message);
       }
     });
+  }
+
+  const genPdfBtn = document.getElementById('generate-pdf-btn');
+  if (genPdfBtn) {
+    genPdfBtn.addEventListener('click', async () => {
+      genPdfBtn.disabled = true;
+      genPdfBtn.textContent = 'Generating...';
+      try {
+        await Api.post('generateInvoicePdf', { jobId: job['Job ID'] });
+        Toast.show('PDF generated');
+        showJobDetail(job['Job ID']);
+      } catch (err) {
+        Toast.show('Error: ' + err.message);
+        genPdfBtn.disabled = false;
+        genPdfBtn.textContent = 'Generate PDF';
+      }
+    });
+  }
+
+  const emailInvoiceBtn = document.getElementById('email-invoice-btn');
+  if (emailInvoiceBtn) {
+    emailInvoiceBtn.addEventListener('click', () => showEmailInvoiceForm(job));
   }
 
   const addLineItemBtn = document.getElementById('add-line-item-btn');
@@ -394,5 +421,53 @@ function wireJobDetail(job) {
 function wireLineItemRemoveButtons() {
   document.querySelectorAll('.li-remove').forEach(btn => {
     btn.onclick = () => btn.closest('tr').remove();
+  });
+}
+
+// ---------- Email invoice ----------
+
+async function showEmailInvoiceForm(job) {
+  let customerEmail = '';
+  try {
+    const customers = await Api.get('getCustomers');
+    const customer = customers.find(c => c['Customer ID'] === job['Customer ID']);
+    if (customer) customerEmail = customer['Email'] || '';
+  } catch (e) {}
+
+  const defaultMessage = `Hi ${job['Customer Name'] || ''},\n\nPlease find attached invoice ${job['Invoice Number']} for ${money(job['Total Amount'])}, due ${formatDate(job['Due Date'])}.\n\nThanks.`;
+
+  document.getElementById('page-container').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <button class="icon-btn" id="back-to-job-from-email">←</button>
+      <h1 style="margin:0">Email Invoice</h1>
+    </div>
+    <form id="email-invoice-form">
+      <div class="field"><label>To</label><input name="toEmail" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@email.com" required /></div>
+      <div class="field"><label>Message</label><textarea name="message" rows="6">${escapeHtml(defaultMessage)}</textarea></div>
+      <p>The current invoice PDF will be attached (regenerated fresh from the latest line items and totals).</p>
+      <button class="btn btn-primary btn-block" type="submit" id="send-email-btn">Send Email</button>
+      <div style="height:10px"></div>
+      <button class="btn btn-secondary btn-block" type="button" id="cancel-email-btn">Cancel</button>
+    </form>
+  `;
+
+  document.getElementById('back-to-job-from-email').addEventListener('click', () => showJobDetail(job['Job ID']));
+  document.getElementById('cancel-email-btn').addEventListener('click', () => showJobDetail(job['Job ID']));
+
+  document.getElementById('email-invoice-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const sendBtn = document.getElementById('send-email-btn');
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending...';
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    try {
+      await Api.post('emailInvoice', { jobId: job['Job ID'], toEmail: data.toEmail, message: data.message });
+      Toast.show('Invoice emailed');
+      showJobDetail(job['Job ID']);
+    } catch (err) {
+      Toast.show('Error: ' + err.message);
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send Email';
+    }
   });
 }
