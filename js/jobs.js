@@ -23,6 +23,14 @@ function paymentBadgeClass(status) {
   return map[status] || 'badge-draft';
 }
 
+function quoteBadgeClass(status) {
+  const map = {
+    'Draft': 'badge-draft', 'Sent': 'badge-sent', 'Accepted': 'badge-paid',
+    'Declined': 'badge-overdue', 'Expired': 'badge-cancelled'
+  };
+  return map[status] || 'badge-draft';
+}
+
 function money(n) {
   const num = parseFloat(n) || 0;
   return '$' + num.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -152,7 +160,8 @@ async function showJobDetail(jobId) {
 
   const pendingLines = [
     ...(window._pendingTimesheetLines || []),
-    ...(window._pendingExpenseLines || [])
+    ...(window._pendingExpenseLines || []),
+    ...(window._pendingQuoteLines || [])
   ];
   if (pendingLines.length) {
     const tbody = document.getElementById('line-items-body');
@@ -174,12 +183,15 @@ async function showJobDetail(jobId) {
     }
     window._pendingTimesheetLines = null;
     window._pendingExpenseLines = null;
+    window._pendingQuoteLines = null;
   }
 }
 
 function renderJobDetail(job) {
   const hasInvoice = !!job['Invoice Number'];
+  const hasQuote = !!job['Quote Number'];
   const lineItems = job._lineItems || [];
+  const quoteLineItems = job._quoteLineItems || [];
 
   const lineItemRows = lineItems.map((li, i) => `
     <tr data-index="${i}" data-source-type="${escapeHtml(li['Source Type'] || '')}" data-source-id="${escapeHtml(li['Source ID'] || '')}">
@@ -187,6 +199,15 @@ function renderJobDetail(job) {
       <td style="width:60px"><input class="li-qty" type="number" step="0.01" value="${li['Quantity'] || 1}" /></td>
       <td style="width:90px"><input class="li-price" type="number" step="0.01" value="${li['Unit Price'] || 0}" /></td>
       <td style="width:34px"><button type="button" class="li-remove">×</button></td>
+    </tr>
+  `).join('');
+
+  const quoteLineItemRows = quoteLineItems.map((li, i) => `
+    <tr data-index="${i}">
+      <td><input class="qli-desc" value="${escapeHtml(li['Description'] || '')}" placeholder="Description" /></td>
+      <td style="width:60px"><input class="qli-qty" type="number" step="0.01" value="${li['Quantity'] || 1}" /></td>
+      <td style="width:90px"><input class="qli-price" type="number" step="0.01" value="${li['Unit Price'] || 0}" /></td>
+      <td style="width:34px"><button type="button" class="qli-remove">×</button></td>
     </tr>
   `).join('');
 
@@ -200,13 +221,55 @@ function renderJobDetail(job) {
       <div class="card-row"><span class="label">Customer</span><span class="value">${escapeHtml(job['Customer Name'] || '')}</span></div>
       <div class="card-row"><span class="label">Address</span><span class="value">${escapeHtml(job['Job Address'] || '—')}</span></div>
       <div class="card-row"><span class="label">Description</span><span class="value">${escapeHtml(job['Job Description'] || '—')}</span></div>
-      <div class="card-row"><span class="label">Quote Amount</span><span class="value">${money(job['Quote Amount'])}</span></div>
+      <div class="card-row"><span class="label">Rough Quote Amount</span><span class="value">${money(job['Quote Amount'])}</span></div>
       <div class="field" style="margin-top:12px">
         <label>Job Status</label>
         <select id="job-status-select">
           ${JOB_STATUSES.map(s => `<option value="${s}" ${s === job['Job Status'] ? 'selected' : ''}>${s}</option>`).join('')}
         </select>
       </div>
+    </div>
+
+    <div class="card">
+      <h3>Quote</h3>
+      ${hasQuote ? `
+        <div class="card-row"><span class="label">Quote Number</span><span class="value">${escapeHtml(job['Quote Number'])}</span></div>
+        <div class="card-row"><span class="label">Valid Until</span><span class="value">${formatDate(job['Quote Expiry Date'])}</span></div>
+        <div class="card-row"><span class="label">Status</span><span class="badge ${quoteBadgeClass(job['Quote Status'])}">${escapeHtml(job['Quote Status'] || 'Draft')}</span></div>
+
+        <table class="li-table" id="quote-line-items-table" style="margin-top:12px">
+          <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th></th></tr></thead>
+          <tbody id="quote-line-items-body">${quoteLineItemRows}</tbody>
+        </table>
+        <button class="btn btn-secondary btn-block" id="add-quote-line-item-btn" type="button">+ Add Line Item</button>
+        <div style="height:10px"></div>
+        <button class="btn btn-primary btn-block" id="save-quote-line-items-btn" type="button">Save Line Items</button>
+
+        <div style="margin-top:14px">
+          <div class="summary-line"><span>Subtotal</span><span>${money(job['Quote Subtotal'])}</span></div>
+          <div class="summary-line"><span>GST</span><span>${money(job['Quote GST'])}</span></div>
+          <div class="summary-line total"><span>Total</span><span>${money(job['Quote Total'])}</span></div>
+        </div>
+
+        <div style="height:16px"></div>
+        <h3>PDF & Email</h3>
+        ${job['Quote PDF Link'] ? `<div class="card-row"><span class="label">Current PDF</span><span class="value"><a href="${escapeHtml(job['Quote PDF Link'])}" target="_blank">📄 View / Download</a></span></div>` : '<p>No PDF generated yet.</p>'}
+        <button class="btn btn-secondary btn-block" id="generate-quote-pdf-btn">${job['Quote PDF Link'] ? 'Regenerate PDF' : 'Generate PDF'}</button>
+        <div style="height:10px"></div>
+        <button class="btn btn-primary btn-block" id="email-quote-btn">✉️ Email Quote to Customer</button>
+
+        <div style="height:16px"></div>
+        <div class="field">
+          <label>Update Status</label>
+          <select id="quote-status-select">
+            ${['Draft', 'Sent', 'Accepted', 'Declined', 'Expired'].map(s => `<option value="${s}" ${s === job['Quote Status'] ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        ${job['Quote Status'] === 'Accepted' ? `<button class="btn btn-secondary btn-block" id="copy-quote-to-invoice-btn">📋 Copy Quote Lines to Invoice</button>` : ''}
+      ` : `
+        <p>No quote yet.</p>
+        <button class="btn btn-primary btn-block" id="generate-quote-btn">Generate Quote</button>
+      `}
     </div>
 
     <div class="card">
@@ -302,6 +365,107 @@ function wireJobDetail(job) {
       Toast.show('Error: ' + err.message);
     }
   });
+
+  // ---------- Quote ----------
+  const genQuoteBtn = document.getElementById('generate-quote-btn');
+  if (genQuoteBtn) {
+    genQuoteBtn.addEventListener('click', async () => {
+      try {
+        await Api.post('generateQuote', { jobId: job['Job ID'] });
+        Toast.show('Quote generated');
+        showJobDetail(job['Job ID']);
+      } catch (err) {
+        Toast.show('Error: ' + err.message);
+      }
+    });
+  }
+
+  const addQuoteLineItemBtn = document.getElementById('add-quote-line-item-btn');
+  if (addQuoteLineItemBtn) {
+    addQuoteLineItemBtn.addEventListener('click', () => {
+      const tbody = document.getElementById('quote-line-items-body');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input class="qli-desc" placeholder="Description" /></td>
+        <td style="width:60px"><input class="qli-qty" type="number" step="0.01" value="1" /></td>
+        <td style="width:90px"><input class="qli-price" type="number" step="0.01" value="0" /></td>
+        <td style="width:34px"><button type="button" class="qli-remove">×</button></td>
+      `;
+      tbody.appendChild(row);
+      wireQuoteLineItemRemoveButtons();
+    });
+    wireQuoteLineItemRemoveButtons();
+  }
+
+  const saveQuoteLineItemsBtn = document.getElementById('save-quote-line-items-btn');
+  if (saveQuoteLineItemsBtn) {
+    saveQuoteLineItemsBtn.addEventListener('click', async () => {
+      const rows = document.querySelectorAll('#quote-line-items-body tr');
+      const lineItems = Array.from(rows).map(row => ({
+        description: row.querySelector('.qli-desc').value,
+        quantity: row.querySelector('.qli-qty').value,
+        unitPrice: row.querySelector('.qli-price').value
+      })).filter(li => li.description.trim() !== '');
+      try {
+        await Api.post('saveQuoteLineItems', { jobId: job['Job ID'], lineItems });
+        Toast.show('Quote line items saved');
+        showJobDetail(job['Job ID']);
+      } catch (err) {
+        Toast.show('Error: ' + err.message);
+      }
+    });
+  }
+
+  const genQuotePdfBtn = document.getElementById('generate-quote-pdf-btn');
+  if (genQuotePdfBtn) {
+    genQuotePdfBtn.addEventListener('click', async () => {
+      genQuotePdfBtn.disabled = true;
+      genQuotePdfBtn.textContent = 'Generating...';
+      try {
+        await Api.post('generateQuotePdf', { jobId: job['Job ID'] });
+        Toast.show('Quote PDF generated');
+        showJobDetail(job['Job ID']);
+      } catch (err) {
+        Toast.show('Error: ' + err.message);
+        genQuotePdfBtn.disabled = false;
+        genQuotePdfBtn.textContent = 'Generate PDF';
+      }
+    });
+  }
+
+  const emailQuoteBtn = document.getElementById('email-quote-btn');
+  if (emailQuoteBtn) {
+    emailQuoteBtn.addEventListener('click', () => showEmailQuoteForm(job));
+  }
+
+  const quoteStatusSelect = document.getElementById('quote-status-select');
+  if (quoteStatusSelect) {
+    quoteStatusSelect.addEventListener('change', async (e) => {
+      try {
+        await Api.post('updateQuoteStatus', { jobId: job['Job ID'], status: e.target.value });
+        Toast.show('Quote status updated');
+        showJobDetail(job['Job ID']);
+      } catch (err) {
+        Toast.show('Error: ' + err.message);
+      }
+    });
+  }
+
+  const copyQuoteToInvoiceBtn = document.getElementById('copy-quote-to-invoice-btn');
+  if (copyQuoteToInvoiceBtn) {
+    copyQuoteToInvoiceBtn.addEventListener('click', () => {
+      const quoteLines = (job._quoteLineItems || []).map(li => ({
+        description: li['Description'], quantity: li['Quantity'], unitPrice: li['Unit Price']
+      }));
+      if (!quoteLines.length) { Toast.show('No quote line items to copy'); return; }
+      window._pendingQuoteLines = quoteLines;
+      if (job['Invoice Number']) {
+        showJobDetail(job['Job ID']); // invoice exists — lines inject immediately
+      } else {
+        Toast.show('Generate the invoice first — these lines will be waiting for you');
+      }
+    });
+  }
 
   document.getElementById('save-costs-btn').addEventListener('click', async () => {
     try {
@@ -431,8 +595,74 @@ function wireJobDetail(job) {
   });
 }
 
+async function showEmailQuoteForm(job) {
+  let customerEmail = '';
+  let settings = {};
+  try {
+    const customers = await Api.get('getCustomers');
+    const customer = customers.find(c => c['Customer ID'] === job['Customer ID']);
+    if (customer) customerEmail = customer['Email'] || '';
+  } catch (e) {}
+  try { settings = await Api.get('getSettings'); } catch (e) {}
+
+  const tokens = {
+    customerName: job['Customer Name'] || '',
+    quoteNumber: job['Quote Number'] || '',
+    total: money(job['Quote Total']),
+    expiryDate: formatDate(job['Quote Expiry Date']),
+    businessName: settings['Business Name'] || ''
+  };
+  function fillTemplate(template) {
+    return Object.keys(tokens).reduce((str, key) => str.split(`{${key}}`).join(tokens[key]), template);
+  }
+  const defaultSubject = fillTemplate(settings['Quote Email Subject'] || 'Quote {quoteNumber} from {businessName}');
+  const defaultMessage = fillTemplate(settings['Quote Email Body'] || 'Hi {customerName},\n\nPlease find attached your quote {quoteNumber} for {total}. This quote is valid until {expiryDate}.\n\nThanks,\n{businessName}');
+
+  document.getElementById('page-container').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <button class="icon-btn" id="back-to-job-from-quote-email">←</button>
+      <h1 style="margin:0">Email Quote</h1>
+    </div>
+    <form id="email-quote-form">
+      <div class="field"><label>To</label><input name="toEmail" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@email.com" required /></div>
+      <div class="field"><label>Subject</label><input name="subject" value="${escapeHtml(defaultSubject)}" /></div>
+      <div class="field"><label>Message</label><textarea name="message" rows="6">${escapeHtml(defaultMessage)}</textarea></div>
+      <p>The current quote PDF will be attached (regenerated fresh from the latest line items). Edit the subject/message defaults anytime in <strong>More → Settings</strong>.</p>
+      <button class="btn btn-primary btn-block" type="submit" id="send-quote-email-btn">Send Email</button>
+      <div style="height:10px"></div>
+      <button class="btn btn-secondary btn-block" type="button" id="cancel-quote-email-btn">Cancel</button>
+    </form>
+  `;
+
+  document.getElementById('back-to-job-from-quote-email').addEventListener('click', () => showJobDetail(job['Job ID']));
+  document.getElementById('cancel-quote-email-btn').addEventListener('click', () => showJobDetail(job['Job ID']));
+
+  document.getElementById('email-quote-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const sendBtn = document.getElementById('send-quote-email-btn');
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending...';
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    try {
+      await Api.post('emailQuote', { jobId: job['Job ID'], toEmail: data.toEmail, subject: data.subject, message: data.message });
+      Toast.show('Quote emailed');
+      showJobDetail(job['Job ID']);
+    } catch (err) {
+      Toast.show('Error: ' + err.message);
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send Email';
+    }
+  });
+}
+
 function wireLineItemRemoveButtons() {
   document.querySelectorAll('.li-remove').forEach(btn => {
+    btn.onclick = () => btn.closest('tr').remove();
+  });
+}
+
+function wireQuoteLineItemRemoveButtons() {
+  document.querySelectorAll('.qli-remove').forEach(btn => {
     btn.onclick = () => btn.closest('tr').remove();
   });
 }
@@ -441,13 +671,26 @@ function wireLineItemRemoveButtons() {
 
 async function showEmailInvoiceForm(job) {
   let customerEmail = '';
+  let settings = {};
   try {
     const customers = await Api.get('getCustomers');
     const customer = customers.find(c => c['Customer ID'] === job['Customer ID']);
     if (customer) customerEmail = customer['Email'] || '';
   } catch (e) {}
+  try { settings = await Api.get('getSettings'); } catch (e) {}
 
-  const defaultMessage = `Hi ${job['Customer Name'] || ''},\n\nPlease find attached invoice ${job['Invoice Number']} for ${money(job['Total Amount'])}, due ${formatDate(job['Due Date'])}.\n\nThanks.`;
+  const tokens = {
+    customerName: job['Customer Name'] || '',
+    invoiceNumber: job['Invoice Number'] || '',
+    total: money(job['Total Amount']),
+    dueDate: formatDate(job['Due Date']),
+    businessName: settings['Business Name'] || ''
+  };
+  function fillTemplate(template) {
+    return Object.keys(tokens).reduce((str, key) => str.split(`{${key}}`).join(tokens[key]), template);
+  }
+  const defaultSubject = fillTemplate(settings['Invoice Email Subject'] || 'Invoice {invoiceNumber} from {businessName}');
+  const defaultMessage = fillTemplate(settings['Invoice Email Body'] || 'Hi {customerName},\n\nPlease find attached invoice {invoiceNumber} for {total}, due {dueDate}.\n\nThanks,\n{businessName}');
 
   document.getElementById('page-container').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -456,8 +699,9 @@ async function showEmailInvoiceForm(job) {
     </div>
     <form id="email-invoice-form">
       <div class="field"><label>To</label><input name="toEmail" type="email" value="${escapeHtml(customerEmail)}" placeholder="customer@email.com" required /></div>
+      <div class="field"><label>Subject</label><input name="subject" value="${escapeHtml(defaultSubject)}" /></div>
       <div class="field"><label>Message</label><textarea name="message" rows="6">${escapeHtml(defaultMessage)}</textarea></div>
-      <p>The current invoice PDF will be attached (regenerated fresh from the latest line items and totals).</p>
+      <p>The current invoice PDF will be attached (regenerated fresh from the latest line items and totals). Edit the subject/message defaults anytime in <strong>More → Settings</strong>.</p>
       <button class="btn btn-primary btn-block" type="submit" id="send-email-btn">Send Email</button>
       <div style="height:10px"></div>
       <button class="btn btn-secondary btn-block" type="button" id="cancel-email-btn">Cancel</button>
@@ -474,7 +718,7 @@ async function showEmailInvoiceForm(job) {
     sendBtn.textContent = 'Sending...';
     const data = Object.fromEntries(new FormData(e.target).entries());
     try {
-      await Api.post('emailInvoice', { jobId: job['Job ID'], toEmail: data.toEmail, message: data.message });
+      await Api.post('emailInvoice', { jobId: job['Job ID'], toEmail: data.toEmail, subject: data.subject, message: data.message });
       Toast.show('Invoice emailed');
       showJobDetail(job['Job ID']);
     } catch (err) {
