@@ -219,7 +219,7 @@ function renderJobDetail(job) {
 
       <div style="height:14px"></div>
 
-      <div class="card-row"><span class="label">Contractors — from Expenses</span><span class="value">${money((parseFloat(job['Contractor Cost']) || 0) - (parseFloat(job['Contractor Cost Manual']) || 0))}</span></div>
+      <div class="card-row"><span class="label">Contractors — Expenses + Payments log</span><span class="value">${money((parseFloat(job['Contractor Cost']) || 0) - (parseFloat(job['Contractor Cost Manual']) || 0))}</span></div>
       <div class="field"><label>Contractors — manual top-up ($)</label><input id="cost-contractor-manual" type="number" step="0.01" value="${job['Contractor Cost Manual'] || 0}" /></div>
       <div class="card-row" style="border-top:1px solid var(--border);margin-top:4px"><span class="label" style="font-weight:700">Total Contractor Cost</span><span class="value">${money(job['Contractor Cost'])}</span></div>
 
