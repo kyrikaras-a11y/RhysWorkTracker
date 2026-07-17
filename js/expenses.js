@@ -79,8 +79,9 @@ function wireExpensesPage() {
 
 // ---------- Category-specific field blocks ----------
 
-function categoryExtraFieldsHtml(category, e) {
+function categoryExtraFieldsHtml(category, e, contractors) {
   e = e || {};
+  contractors = contractors || [];
   if (category === 'Vehicle Expenses') {
     return `
       <div class="field"><label>Vehicle</label><input name="vehicle" value="${escapeHtml(e['Vehicle'] || '')}" placeholder="e.g. Hilux, Van 1..." /></div>
@@ -98,6 +99,17 @@ function categoryExtraFieldsHtml(category, e) {
         <div class="field"><label>Renewal Date</label><input name="renewalDate" type="date" value="${formatDateForInput(e['Renewal Date'])}" /></div>
       </div>
       <div class="field"><label>Premium ($)</label><input name="premium" type="number" step="0.01" value="${escapeHtml(e['Premium'] || '')}" /></div>
+    `;
+  }
+  if (category === 'Labour & Contractors') {
+    const options = `<option value="">— Not linked to a contractor profile —</option>` + contractors.map(c =>
+      `<option value="${escapeHtml(c['Contractor ID'])}" ${e['Contractor ID'] === c['Contractor ID'] ? 'selected' : ''}>${escapeHtml(c['Name'])}</option>`
+    ).join('');
+    return `
+      <div class="field">
+        <label>Contractor <span style="font-weight:400;text-transform:none">— links this to their profile & annual summary</span></label>
+        <select name="contractorId">${options}</select>
+      </div>
     `;
   }
   return '';
@@ -126,8 +138,10 @@ function recurringFieldsHtml(e) {
 async function showExpenseForm(expense) {
   let jobs = [];
   let settings = {};
+  let contractors = [];
   try { jobs = await Api.get('getJobs'); } catch (e) {}
   try { settings = await Api.get('getSettings'); } catch (e) {}
+  try { contractors = await Api.get('getContractors'); } catch (e) {}
 
   const jobOptions = `<option value="">— None —</option>` + jobs.map(j =>
     `<option value="${escapeHtml(j['Job ID'])}" ${expense && expense['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(j['Customer Name'])} — ${escapeHtml(j['Job ID'])}</option>`
@@ -162,7 +176,7 @@ async function showExpenseForm(expense) {
       <div class="card-row"><span class="label">GST (${((parseFloat(settings['Default GST Rate']) || 0.10) * 100).toFixed(0)}%)</span><span class="value" id="exp-gst-preview">${expMoney(expense ? expense['GST Amount'] : 0)}</span></div>
       <div class="card-row"><span class="label">Total incl. GST</span><span class="value" id="exp-total-preview">${expMoney(expense ? expense['Total Amount'] : 0)}</span></div>
 
-      <div id="category-extra-fields">${categoryExtraFieldsHtml(category, expense)}</div>
+      <div id="category-extra-fields">${categoryExtraFieldsHtml(category, expense, contractors)}</div>
       <div id="recurring-fields">${recurringFieldsHtml(expense)}</div>
 
       <div class="field">
@@ -195,7 +209,7 @@ async function showExpenseForm(expense) {
   });
 
   document.getElementById('expense-category').addEventListener('change', (e) => {
-    document.getElementById('category-extra-fields').innerHTML = categoryExtraFieldsHtml(e.target.value, expense);
+    document.getElementById('category-extra-fields').innerHTML = categoryExtraFieldsHtml(e.target.value, expense, contractors);
   });
 
   wireRecurringToggle();
