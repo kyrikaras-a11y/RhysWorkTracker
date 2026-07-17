@@ -74,7 +74,7 @@ html, body {
 }
 
 body {
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
   padding-top: env(safe-area-inset-top);
 }
 
@@ -114,6 +114,11 @@ p { margin: 0 0 8px; color: var(--text-muted); }
 
 /* ---------- Page container ---------- */
 .page { padding: 16px 16px 32px; max-width: 640px; margin: 0 auto; }
+.page::after {
+  content: '';
+  display: block;
+  height: 48px;
+}
 .page.hidden { display: none; }
 
 /* ---------- Cards ---------- */
