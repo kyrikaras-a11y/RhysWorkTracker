@@ -238,7 +238,25 @@ Router.register('settings', async () => {
       </div>
       <div class="field"><label>Default GST Rate</label><input id="s-gst" value="${escapeHtml(settings['Default GST Rate'] || '0.10')}" /></div>
       <div class="field"><label>Default Hourly Rate ($)</label><input id="s-hourly-rate" type="number" step="0.01" value="${escapeHtml(settings['Default Hourly Rate'] || '65')}" /></div>
-      <button class="btn btn-primary btn-block" id="save-settings-btn">Save Business Details</button>
+      <div class="field-row">
+        <div class="field"><label>Invoice Payment Terms (days)</label><input id="s-invoice-terms-days" type="number" value="${escapeHtml(settings['Invoice Payment Terms (days)'] || '14')}" /></div>
+        <div class="field"><label>Quote Validity (days)</label><input id="s-quote-validity-days" type="number" value="${escapeHtml(settings['Quote Validity (days)'] || '30')}" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Quote Email Template</h3>
+      <p style="margin-top:4px">Available placeholders: <code>{customerName}</code>, <code>{quoteNumber}</code>, <code>{total}</code>, <code>{expiryDate}</code>, <code>{businessName}</code></p>
+      <div class="field"><label>Subject</label><input id="s-quote-email-subject" value="${escapeHtml(settings['Quote Email Subject'] || 'Quote {quoteNumber} from {businessName}')}" /></div>
+      <div class="field"><label>Body</label><textarea id="s-quote-email-body" rows="6">${escapeHtml(settings['Quote Email Body'] || 'Hi {customerName},\n\nPlease find attached your quote {quoteNumber} for {total}. This quote is valid until {expiryDate}.\n\nLet me know if you have any questions.\n\nThanks,\n{businessName}')}</textarea></div>
+    </div>
+
+    <div class="card">
+      <h3>Invoice Email Template</h3>
+      <p style="margin-top:4px">Used as the starting subject/message whenever you email an invoice — still fully editable at send time. Available placeholders: <code>{customerName}</code>, <code>{invoiceNumber}</code>, <code>{total}</code>, <code>{dueDate}</code>, <code>{businessName}</code></p>
+      <div class="field"><label>Subject</label><input id="s-email-subject" value="${escapeHtml(settings['Invoice Email Subject'] || 'Invoice {invoiceNumber} from {businessName}')}" /></div>
+      <div class="field"><label>Body</label><textarea id="s-email-body" rows="6">${escapeHtml(settings['Invoice Email Body'] || 'Hi {customerName},\n\nPlease find attached invoice {invoiceNumber} for {total}, due {dueDate}.\n\nThanks,\n{businessName}')}</textarea></div>
+      <button class="btn btn-primary btn-block" id="save-settings-btn">Save Settings</button>
     </div>
 
     <div class="card">
@@ -272,7 +290,13 @@ function wireSettingsPage() {
         'Phone': document.getElementById('s-phone').value,
         'Email': document.getElementById('s-email').value,
         'Default GST Rate': document.getElementById('s-gst').value,
-        'Default Hourly Rate': document.getElementById('s-hourly-rate').value
+        'Default Hourly Rate': document.getElementById('s-hourly-rate').value,
+        'Invoice Payment Terms (days)': document.getElementById('s-invoice-terms-days').value,
+        'Quote Validity (days)': document.getElementById('s-quote-validity-days').value,
+        'Quote Email Subject': document.getElementById('s-quote-email-subject').value,
+        'Quote Email Body': document.getElementById('s-quote-email-body').value,
+        'Invoice Email Subject': document.getElementById('s-email-subject').value,
+        'Invoice Email Body': document.getElementById('s-email-body').value
       };
       try {
         await Api.post('saveSettings', payload);
@@ -284,7 +308,19 @@ function wireSettingsPage() {
   }
 }
 
-// ---------- Helpers ----------
+// ---------- Shared helpers ----------
+
+/**
+ * Label used in job <select> dropdowns across the app — includes the job
+ * description in brackets for easier picking, but this is purely a UI
+ * label; it never gets pulled into invoices or any other document.
+ */
+function jobDropdownLabel(j) {
+  const desc = (j['Job Description'] || '').trim();
+  const truncated = desc.length > 40 ? desc.slice(0, 40) + '…' : desc;
+  return `${j['Customer Name']} — ${j['Job ID']}${truncated ? ' (' + truncated + ')' : ''}`;
+}
+
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (m) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
