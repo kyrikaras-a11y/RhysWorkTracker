@@ -150,10 +150,14 @@ async function showJobDetail(jobId) {
   container.innerHTML = renderJobDetail(job);
   wireJobDetail(job);
 
-  if (window._pendingTimesheetLines && window._pendingTimesheetLines.length) {
+  const pendingLines = [
+    ...(window._pendingTimesheetLines || []),
+    ...(window._pendingExpenseLines || [])
+  ];
+  if (pendingLines.length) {
     const tbody = document.getElementById('line-items-body');
     if (tbody) {
-      window._pendingTimesheetLines.forEach(line => {
+      pendingLines.forEach(line => {
         const row = document.createElement('tr');
         row.innerHTML = `
           <td><input class="li-desc" value="${escapeHtml(line.description)}" /></td>
@@ -164,10 +168,11 @@ async function showJobDetail(jobId) {
         tbody.appendChild(row);
       });
       wireLineItemRemoveButtons();
-      Toast.show(`${window._pendingTimesheetLines.length} line(s) added — review and hit Save Line Items`);
+      Toast.show(`${pendingLines.length} line(s) added — review and hit Save Line Items`);
     }
     window._pendingTimesheetLines = null;
-    // _pendingTimesheetIds is intentionally kept until the save succeeds
+    window._pendingExpenseLines = null;
+    // _pendingTimesheetIds / _pendingExpenseIds are intentionally kept until the save succeeds
   }
 }
 
@@ -241,6 +246,8 @@ function renderJobDetail(job) {
         <button class="btn btn-secondary btn-block" id="add-line-item-btn" type="button">+ Add Line Item</button>
         <div style="height:10px"></div>
         <button class="btn btn-secondary btn-block" id="add-from-timesheets-btn" type="button">🕒 Add from Timesheets</button>
+        <div style="height:10px"></div>
+        <button class="btn btn-secondary btn-block" id="add-from-expenses-btn" type="button">📦 Add from Expenses</button>
         <div style="height:10px"></div>
         <button class="btn btn-primary btn-block" id="save-line-items-btn" type="button">Save Line Items</button>
 
@@ -367,6 +374,11 @@ function wireJobDetail(job) {
     addFromTimesheetsBtn.addEventListener('click', () => showTimesheetPickerForInvoice(job['Job ID']));
   }
 
+  const addFromExpensesBtn = document.getElementById('add-from-expenses-btn');
+  if (addFromExpensesBtn) {
+    addFromExpensesBtn.addEventListener('click', () => showExpensePickerForInvoice(job['Job ID']));
+  }
+
   const saveLineItemsBtn = document.getElementById('save-line-items-btn');
   if (saveLineItemsBtn) {
     saveLineItemsBtn.addEventListener('click', async () => {
@@ -377,9 +389,11 @@ function wireJobDetail(job) {
         unitPrice: row.querySelector('.li-price').value
       })).filter(li => li.description.trim() !== '');
       const timesheetIds = window._pendingTimesheetIds || [];
+      const expenseIds = window._pendingExpenseIds || [];
       try {
-        await Api.post('saveLineItems', { jobId: job['Job ID'], lineItems, timesheetIds });
+        await Api.post('saveLineItems', { jobId: job['Job ID'], lineItems, timesheetIds, expenseIds });
         window._pendingTimesheetIds = null;
+        window._pendingExpenseIds = null;
         Toast.show('Line items saved');
         showJobDetail(job['Job ID']);
       } catch (err) {
