@@ -144,7 +144,7 @@ async function showExpenseForm(expense) {
   try { contractors = await Api.get('getContractors'); } catch (e) {}
 
   const jobOptions = `<option value="">— None —</option>` + jobs.map(j =>
-    `<option value="${escapeHtml(j['Job ID'])}" ${expense && expense['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(j['Customer Name'])} — ${escapeHtml(j['Job ID'])}</option>`
+    `<option value="${escapeHtml(j['Job ID'])}" ${expense && expense['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(jobDropdownLabel(j))}</option>`
   ).join('');
 
   const category = expense ? expense['Category'] : EXPENSE_CATEGORIES[0];
