@@ -394,21 +394,22 @@ async function showTimesheetPickerForInvoice(jobId) {
         const showHours = showHoursMap[c.dataset.tsId];
         const label = `${c.dataset.date} — ${c.dataset.desc || 'Labour'}`;
         if (showHours) {
-          return { description: label, quantity: c.dataset.hours, unitPrice: c.dataset.rate };
+          return { description: label, quantity: c.dataset.hours, unitPrice: c.dataset.rate, sourceType: 'Timesheet', sourceId: c.dataset.tsId };
         }
         const total = (parseFloat(c.dataset.hours) || 0) * (parseFloat(c.dataset.rate) || 0);
-        return { description: label, quantity: 1, unitPrice: total.toFixed(2) };
+        return { description: label, quantity: 1, unitPrice: total.toFixed(2), sourceType: 'Timesheet', sourceId: c.dataset.tsId };
       });
     } else {
       pendingLines = [{
         description: document.getElementById('lumpsum-desc').value || 'Labour',
         quantity: 1,
-        unitPrice: document.getElementById('lumpsum-amount').value
+        unitPrice: document.getElementById('lumpsum-amount').value,
+        sourceType: 'Timesheet',
+        sourceId: timesheetIds.join(',')
       }];
     }
 
     window._pendingTimesheetLines = pendingLines;
-    window._pendingTimesheetIds = timesheetIds;
     showJobDetail(jobId);
   });
 }
