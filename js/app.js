@@ -54,26 +54,6 @@ const Router = {
 };
 
 // ---------- Dashboard (placeholder — full version in Stage 6) ----------
-Router.register('dashboard', async () => {
-  let connected = false;
-  try { await Api.testConnection(); connected = true; } catch (e) {}
-
-  return `
-    <h1>Dashboard</h1>
-    <p>${connected ? 'Connected to your Google Sheet.' : 'Not connected yet — head to Settings to add your API URL.'}</p>
-    <div class="stat-grid">
-      <div class="stat-card"><div class="stat-label">Income (FYTD)</div><div class="stat-value">—</div></div>
-      <div class="stat-card"><div class="stat-label">Expenses (FYTD)</div><div class="stat-value">—</div></div>
-      <div class="stat-card"><div class="stat-label">Net Profit</div><div class="stat-value">—</div></div>
-      <div class="stat-card"><div class="stat-label">GST Payable (est.)</div><div class="stat-value">—</div></div>
-    </div>
-    <div class="card">
-      <h3>Coming in later stages</h3>
-      <p style="margin-top:8px">Live income/expense/profit figures, GST tracking, job stats and charts land in Stage 6 once Jobs, Invoices and Expenses modules (Stages 2–5) are built.</p>
-    </div>
-  `;
-});
-
 // ---------- Customers (full working reference module) ----------
 Router.register('customers', async () => {
   let customers = [];
@@ -324,6 +304,7 @@ async function navigateAndWire(route) {
   if (route === 'contractors') wireContractorsPage();
   if (route === 'assets') wireAssetsPage();
   if (route === 'gst') wireGstPage();
+  if (route === 'dashboard') wireDashboardPage();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
