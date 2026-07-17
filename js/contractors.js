@@ -118,18 +118,18 @@ function showContractorForm(contractor) {
 async function showContractorDetail(contractor) {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="spinner"></div>';
-  let payments = [];
-  try { payments = await Api.get('getContractorPayments', { contractorId: contractor['Contractor ID'] }); } catch (e) {}
+  let history = [];
+  try { history = await Api.get('getContractorPaymentHistory', { contractorId: contractor['Contractor ID'] }); } catch (e) {}
 
-  const totalPaid = payments.reduce((s, p) => s + (parseFloat(p['Total']) || 0), 0);
+  const totalPaid = history.reduce((s, p) => s + (parseFloat(p.total) || 0), 0);
 
-  const rows = payments.map(p => `
-    <div class="list-item" data-payment-id="${escapeHtml(p['Payment ID'])}">
+  const rows = history.map(p => `
+    <div class="list-item" data-payment-id="${escapeHtml(p.id)}" data-source="${escapeHtml(p.source)}">
       <div class="li-main">
-        <div class="li-title">${formatDate(p['Date'])} — ${escapeHtml(p['Description'] || 'Payment')}</div>
-        <div class="li-sub">${escapeHtml(p['Job ID'] || 'No job linked')}${p['Invoice Number'] ? ' · ' + escapeHtml(p['Invoice Number']) : ''}</div>
+        <div class="li-title">${formatDate(p.date)} — ${escapeHtml(p.description || 'Payment')}</div>
+        <div class="li-sub">${escapeHtml(p.jobId || 'No job linked')}${p.invoiceNumber ? ' · ' + escapeHtml(p.invoiceNumber) : ''} · <span style="opacity:0.7">via ${escapeHtml(p.source)}</span></div>
       </div>
-      <div class="li-amount">${money(p['Total'])}</div>
+      <div class="li-amount">${money(p.total)}</div>
     </div>
   `).join('');
 
@@ -145,9 +145,9 @@ async function showContractorDetail(contractor) {
       <div class="card-row"><span class="label">Email</span><span class="value">${escapeHtml(contractor['Email'] || '—')}</span></div>
       <button class="btn btn-secondary btn-block" id="edit-contractor-btn" style="margin-top:12px">Edit Profile</button>
     </div>
-    <div class="card-row"><span class="label">Total Paid</span><span class="value">${money(totalPaid)}</span></div>
+    <div class="card-row"><span class="label">Total Paid (Payment Log + Expenses)</span><span class="value">${money(totalPaid)}</span></div>
     <h3 style="margin-top:14px">Payment History</h3>
-    <div id="payment-list">${payments.length ? rows : '<div class="empty-state">No payments logged yet.</div>'}</div>
+    <div id="payment-list">${history.length ? rows : '<div class="empty-state">No payments logged yet.</div>'}</div>
     <button class="fab" id="add-payment-fab">+</button>
   `;
 
@@ -156,8 +156,18 @@ async function showContractorDetail(contractor) {
   document.getElementById('add-payment-fab').addEventListener('click', () => showPaymentForm(contractor, null));
   document.querySelectorAll('#payment-list .list-item').forEach(item => {
     item.addEventListener('click', () => {
-      const p = payments.find(x => x['Payment ID'] === item.dataset.paymentId);
-      if (p) showPaymentForm(contractor, p);
+      if (item.dataset.source === 'Expense') {
+        Toast.show('This was logged as an Expense — edit it from the Expenses tab');
+        return;
+      }
+      const p = history.find(x => x.id === item.dataset.paymentId && x.source === 'Payment Log');
+      if (p) {
+        // showPaymentForm expects the raw sheet shape; re-fetch it precisely
+        Api.get('getContractorPayments', { contractorId: contractor['Contractor ID'] }).then(payments => {
+          const full = payments.find(x => x['Payment ID'] === item.dataset.paymentId);
+          if (full) showPaymentForm(contractor, full);
+        });
+      }
     });
   });
 }
