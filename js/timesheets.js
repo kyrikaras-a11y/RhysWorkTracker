@@ -324,12 +324,16 @@ async function showTimesheetPickerForInvoice(jobId) {
 
   const rows = entries.map(e => `
     <div class="list-item">
-      <label style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer">
+      <label style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer">
         <input type="checkbox" class="ts-pick" data-ts-id="${e['Timesheet ID']}" data-hours="${e['Hours']}" data-rate="${e['Hourly Rate']}" data-desc="${escapeHtml(e['Description'] || '')}" data-date="${formatDate(e['Date'])}" checked style="width:20px;height:20px" />
         <div class="li-main" style="flex:1">
           <div class="li-title">${formatDate(e['Date'])} — ${e['Hours']}h</div>
           <div class="li-sub">${escapeHtml(e['Description'] || '')}</div>
         </div>
+      </label>
+      <label class="ts-show-hours-wrap" style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text-muted);white-space:nowrap;cursor:pointer">
+        <input type="checkbox" class="ts-show-hours" data-ts-id="${e['Timesheet ID']}" checked style="width:16px;height:16px" />
+        Show hrs
       </label>
     </div>
   `).join('');
@@ -340,14 +344,15 @@ async function showTimesheetPickerForInvoice(jobId) {
       <h1 style="margin:0">Add from Timesheets</h1>
     </div>
     <div class="card">${rows}</div>
+    <p style="margin-top:-6px">Untick "Show hrs" on any day to bill it as a flat amount instead of hours × rate — handy for a quoted job where you don't want the hours visible for that entry.</p>
 
     <div class="card">
-      <h3>How should this appear on the invoice?</h3>
+      <h3>Combine into one line?</h3>
       <div class="field">
-        <label><input type="radio" name="ts-mode" value="breakdown" checked /> Show hours breakdown (one line per day)</label>
+        <label><input type="radio" name="ts-mode" value="breakdown" checked /> Keep as separate lines (one per day, using the "Show hrs" setting above)</label>
       </div>
       <div class="field">
-        <label><input type="radio" name="ts-mode" value="lumpsum" /> Lump sum total only (hide hours)</label>
+        <label><input type="radio" name="ts-mode" value="lumpsum" /> Combine everything into a single lump sum line</label>
       </div>
       <div id="lumpsum-fields" style="display:none">
         <div class="field"><label>Line description</label><input id="lumpsum-desc" value="Labour" /></div>
@@ -366,8 +371,11 @@ async function showTimesheetPickerForInvoice(jobId) {
 
   document.querySelectorAll('input[name="ts-mode"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      document.getElementById('lumpsum-fields').style.display =
-        document.querySelector('input[name="ts-mode"]:checked').value === 'lumpsum' ? 'block' : 'none';
+      const isLumpSum = document.querySelector('input[name="ts-mode"]:checked').value === 'lumpsum';
+      document.getElementById('lumpsum-fields').style.display = isLumpSum ? 'block' : 'none';
+      document.querySelectorAll('.ts-show-hours-wrap').forEach(el => {
+        el.style.visibility = isLumpSum ? 'hidden' : 'visible';
+      });
     });
   });
 
@@ -377,13 +385,20 @@ async function showTimesheetPickerForInvoice(jobId) {
     const mode = document.querySelector('input[name="ts-mode"]:checked').value;
     const timesheetIds = checked.map(c => c.dataset.tsId);
 
+    const showHoursMap = {};
+    document.querySelectorAll('.ts-show-hours').forEach(cb => { showHoursMap[cb.dataset.tsId] = cb.checked; });
+
     let pendingLines;
     if (mode === 'breakdown') {
-      pendingLines = checked.map(c => ({
-        description: `${c.dataset.date} — ${c.dataset.desc || 'Labour'}`,
-        quantity: c.dataset.hours,
-        unitPrice: c.dataset.rate
-      }));
+      pendingLines = checked.map(c => {
+        const showHours = showHoursMap[c.dataset.tsId];
+        const label = `${c.dataset.date} — ${c.dataset.desc || 'Labour'}`;
+        if (showHours) {
+          return { description: label, quantity: c.dataset.hours, unitPrice: c.dataset.rate };
+        }
+        const total = (parseFloat(c.dataset.hours) || 0) * (parseFloat(c.dataset.rate) || 0);
+        return { description: label, quantity: 1, unitPrice: total.toFixed(2) };
+      });
     } else {
       pendingLines = [{
         description: document.getElementById('lumpsum-desc').value || 'Labour',
