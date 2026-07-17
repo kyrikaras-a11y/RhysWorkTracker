@@ -176,7 +176,7 @@ async function showPaymentForm(contractor, payment) {
   let jobs = [];
   try { jobs = await Api.get('getJobs'); } catch (e) {}
   const jobOptions = `<option value="">— None —</option>` + jobs.map(j =>
-    `<option value="${escapeHtml(j['Job ID'])}" ${payment && payment['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(j['Customer Name'])} — ${escapeHtml(j['Job ID'])}</option>`
+    `<option value="${escapeHtml(j['Job ID'])}" ${payment && payment['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(jobDropdownLabel(j))}</option>`
   ).join('');
 
   document.getElementById('page-container').innerHTML = `
