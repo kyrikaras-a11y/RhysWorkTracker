@@ -25,9 +25,10 @@ Router.register('dashboard', async () => {
   }
 
   let data = null;
-  try { data = await Api.get('getDashboardData'); } catch (e) {}
+  let loadError = null;
+  try { data = await Api.get('getDashboardData'); } catch (e) { loadError = e.message; }
   if (!data) {
-    return `<h1>Dashboard</h1><div class="empty-state">Couldn't load dashboard data. Pull to refresh or check your connection in Settings.</div>`;
+    return `<h1>Dashboard</h1><div class="empty-state">Couldn't load dashboard data.${loadError ? `<br><small>${escapeHtml(loadError)}</small>` : ''}</div>`;
   }
   window._dashboardData = data;
   return renderDashboard(data);
