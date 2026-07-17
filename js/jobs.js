@@ -159,6 +159,8 @@ async function showJobDetail(jobId) {
     if (tbody) {
       pendingLines.forEach(line => {
         const row = document.createElement('tr');
+        row.dataset.sourceType = line.sourceType || '';
+        row.dataset.sourceId = line.sourceId || '';
         row.innerHTML = `
           <td><input class="li-desc" value="${escapeHtml(line.description)}" /></td>
           <td style="width:60px"><input class="li-qty" type="number" step="0.01" value="${line.quantity}" /></td>
@@ -172,7 +174,6 @@ async function showJobDetail(jobId) {
     }
     window._pendingTimesheetLines = null;
     window._pendingExpenseLines = null;
-    // _pendingTimesheetIds / _pendingExpenseIds are intentionally kept until the save succeeds
   }
 }
 
@@ -181,7 +182,7 @@ function renderJobDetail(job) {
   const lineItems = job._lineItems || [];
 
   const lineItemRows = lineItems.map((li, i) => `
-    <tr data-index="${i}">
+    <tr data-index="${i}" data-source-type="${escapeHtml(li['Source Type'] || '')}" data-source-id="${escapeHtml(li['Source ID'] || '')}">
       <td><input class="li-desc" value="${escapeHtml(li['Description'] || '')}" placeholder="Description" /></td>
       <td style="width:60px"><input class="li-qty" type="number" step="0.01" value="${li['Quantity'] || 1}" /></td>
       <td style="width:90px"><input class="li-price" type="number" step="0.01" value="${li['Unit Price'] || 0}" /></td>
@@ -386,14 +387,12 @@ function wireJobDetail(job) {
       const lineItems = Array.from(rows).map(row => ({
         description: row.querySelector('.li-desc').value,
         quantity: row.querySelector('.li-qty').value,
-        unitPrice: row.querySelector('.li-price').value
+        unitPrice: row.querySelector('.li-price').value,
+        sourceType: row.dataset.sourceType || '',
+        sourceId: row.dataset.sourceId || ''
       })).filter(li => li.description.trim() !== '');
-      const timesheetIds = window._pendingTimesheetIds || [];
-      const expenseIds = window._pendingExpenseIds || [];
       try {
-        await Api.post('saveLineItems', { jobId: job['Job ID'], lineItems, timesheetIds, expenseIds });
-        window._pendingTimesheetIds = null;
-        window._pendingExpenseIds = null;
+        await Api.post('saveLineItems', { jobId: job['Job ID'], lineItems });
         Toast.show('Line items saved');
         showJobDetail(job['Job ID']);
       } catch (err) {
