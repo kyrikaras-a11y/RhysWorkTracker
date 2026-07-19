@@ -238,9 +238,19 @@ Router.register('settings', async () => {
       </div>
       <div class="field"><label>Default GST Rate</label><input id="s-gst" value="${escapeHtml(settings['Default GST Rate'] || '0.10')}" /></div>
       <div class="field"><label>Default Hourly Rate ($)</label><input id="s-hourly-rate" type="number" step="0.01" value="${escapeHtml(settings['Default Hourly Rate'] || '65')}" /></div>
+      <div class="field"><label>Trade Licence Number <span style="font-weight:400;text-transform:none">— shown on quotes & invoices</span></label><input id="s-licence-number" value="${escapeHtml(settings['Licence Number'] || '')}" /></div>
       <div class="field-row">
         <div class="field"><label>Invoice Payment Terms (days)</label><input id="s-invoice-terms-days" type="number" value="${escapeHtml(settings['Invoice Payment Terms (days)'] || '14')}" /></div>
         <div class="field"><label>Quote Validity (days)</label><input id="s-quote-validity-days" type="number" value="${escapeHtml(settings['Quote Validity (days)'] || '30')}" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Bank Details <span style="font-weight:400;text-transform:none">— shown on invoices</span></h3>
+      <div class="field"><label>Account Name</label><input id="s-bank-name" value="${escapeHtml(settings['Bank Account Name'] || '')}" /></div>
+      <div class="field-row">
+        <div class="field"><label>BSB <span style="font-weight:400;text-transform:none">— leading 0 is kept</span></label><input id="s-bank-bsb" value="${escapeHtml(settings['Bank BSB'] || '')}" placeholder="e.g. 011123" /></div>
+        <div class="field"><label>Account Number</label><input id="s-bank-account" value="${escapeHtml(settings['Bank Account Number'] || '')}" placeholder="e.g. 0412345678" /></div>
       </div>
     </div>
 
@@ -291,8 +301,12 @@ function wireSettingsPage() {
         'Email': document.getElementById('s-email').value,
         'Default GST Rate': document.getElementById('s-gst').value,
         'Default Hourly Rate': document.getElementById('s-hourly-rate').value,
+        'Licence Number': document.getElementById('s-licence-number').value,
         'Invoice Payment Terms (days)': document.getElementById('s-invoice-terms-days').value,
         'Quote Validity (days)': document.getElementById('s-quote-validity-days').value,
+        'Bank Account Name': document.getElementById('s-bank-name').value,
+        'Bank BSB': document.getElementById('s-bank-bsb').value,
+        'Bank Account Number': document.getElementById('s-bank-account').value,
         'Quote Email Subject': document.getElementById('s-quote-email-subject').value,
         'Quote Email Body': document.getElementById('s-quote-email-body').value,
         'Invoice Email Subject': document.getElementById('s-email-subject').value,
