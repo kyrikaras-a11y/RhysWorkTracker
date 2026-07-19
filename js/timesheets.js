@@ -163,8 +163,15 @@ function showDayDetail(day) {
 // ---------- Add / edit form ----------
 
 async function showTimesheetForm(entry, prefillDate) {
-  let jobs = [];
-  try { jobs = await Api.get('getJobs'); } catch (e) {}
+  document.getElementById('page-container').innerHTML = '<div class="spinner"></div>';
+  let jobs = [], settings = {}, customers = [];
+  try {
+    const bootstrap = await Api.get('getTimesheetFormBootstrap');
+    jobs = bootstrap.jobs || [];
+    settings = bootstrap.settings || {};
+    customers = bootstrap.customers || [];
+  } catch (e) {}
+
   if (!jobs.length) {
     document.getElementById('page-container').innerHTML = `
       <h1>${entry ? 'Edit' : 'New'} Timesheet Entry</h1>
@@ -179,13 +186,7 @@ async function showTimesheetForm(entry, prefillDate) {
     `<option value="${escapeHtml(j['Job ID'])}" ${entry && entry['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(jobDropdownLabel(j))}</option>`
   ).join('');
 
-  let defaultRate = 65;
-  let customers = [];
-  try {
-    const s = await Api.get('getSettings');
-    defaultRate = parseFloat(s['Default Hourly Rate']) || 65;
-  } catch (e) {}
-  try { customers = await Api.get('getCustomers'); } catch (e) {}
+  const defaultRate = parseFloat(settings['Default Hourly Rate']) || 65;
 
   const customerRateById = {};
   customers.forEach(c => {
