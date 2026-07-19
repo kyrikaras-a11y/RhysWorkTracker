@@ -136,12 +136,14 @@ function recurringFieldsHtml(e) {
 // ---------- Add / edit form ----------
 
 async function showExpenseForm(expense) {
-  let jobs = [];
-  let settings = {};
-  let contractors = [];
-  try { jobs = await Api.get('getJobs'); } catch (e) {}
-  try { settings = await Api.get('getSettings'); } catch (e) {}
-  try { contractors = await Api.get('getContractors'); } catch (e) {}
+  document.getElementById('page-container').innerHTML = '<div class="spinner"></div>';
+  let jobs = [], settings = {}, contractors = [];
+  try {
+    const bootstrap = await Api.get('getExpenseFormBootstrap');
+    jobs = bootstrap.jobs || [];
+    settings = bootstrap.settings || {};
+    contractors = bootstrap.contractors || [];
+  } catch (e) {}
 
   const jobOptions = `<option value="">— None —</option>` + jobs.map(j =>
     `<option value="${escapeHtml(j['Job ID'])}" ${expense && expense['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(jobDropdownLabel(j))}</option>`
