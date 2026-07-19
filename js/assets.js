@@ -64,6 +64,14 @@ function showAssetForm(asset) {
         <div class="field"><label>Warranty Expiry</label><input name="warrantyExpiry" type="date" value="${formatDateForInput(asset ? asset['Warranty Expiry'] : '')}" /></div>
       </div>
 
+      <div class="field">
+        <label>Receipt / Proof of Purchase</label>
+        <input id="asset-receipt-input" type="file" accept="image/*,application/pdf" />
+        <div id="asset-receipt-preview" style="margin-top:8px">
+          ${asset && asset['Receipt Link'] ? `<a href="${escapeHtml(asset['Receipt Link'])}" target="_blank">📎 View current receipt</a>` : ''}
+        </div>
+      </div>
+
       <h3 style="margin-top:16px">Disposal (if sold/scrapped)</h3>
       <div class="field-row">
         <div class="field"><label>Disposal Date</label><input name="disposalDate" type="date" value="${formatDateForInput(asset ? asset['Disposal Date'] : '')}" /></div>
@@ -94,9 +102,28 @@ function showAssetForm(asset) {
     });
   }
 
+  let pendingAssetReceipt = null;
+  const assetReceiptInput = document.getElementById('asset-receipt-input');
+  assetReceiptInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('asset-receipt-preview').innerHTML = '<span class="li-sub">Processing file…</span>';
+    try {
+      pendingAssetReceipt = await processReceiptFile(file);
+      document.getElementById('asset-receipt-preview').innerHTML = `<span class="li-sub">✅ File ready to attach (${pendingAssetReceipt.fileName})</span>`;
+    } catch (err) {
+      document.getElementById('asset-receipt-preview').innerHTML = `<span class="li-sub">Couldn't process file: ${err.message}</span>`;
+    }
+  });
+
   document.getElementById('asset-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target).entries());
+    if (pendingAssetReceipt) {
+      data.receiptBase64 = pendingAssetReceipt.base64;
+      data.receiptMimeType = pendingAssetReceipt.mimeType;
+      data.receiptFileName = pendingAssetReceipt.fileName;
+    }
     try {
       if (asset) {
         data.assetId = asset['Asset ID'];
