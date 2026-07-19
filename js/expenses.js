@@ -171,8 +171,19 @@ async function showExpenseForm(expense) {
       <div class="field"><label>Description</label><input name="description" value="${escapeHtml(expense ? expense['Description'] : '')}" /></div>
       <div class="field"><label>Link to Job (optional)</label><select name="jobId">${jobOptions}</select></div>
 
+      <div class="field">
+        <label>Amount is</label>
+        <div style="display:flex;gap:16px;padding:4px 0">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer">
+            <input type="radio" name="gstMode" value="exclusive" id="gst-mode-exclusive" checked /> Excl. GST
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer">
+            <input type="radio" name="gstMode" value="inclusive" id="gst-mode-inclusive" /> Incl. GST
+          </label>
+        </div>
+      </div>
       <div class="field-row">
-        <div class="field"><label>Amount excl. GST ($)</label><input id="exp-amount" name="amountExGst" type="number" step="0.01" value="${expense ? expense['Amount Ex GST'] : ''}" required /></div>
+        <div class="field"><label id="exp-amount-label">Amount ($)</label><input id="exp-amount" name="amount" type="number" step="0.01" value="${expense ? expense['Amount Ex GST'] : ''}" required /></div>
         <div class="field"><label>Payment Method</label><input name="paymentMethod" value="${escapeHtml(expense ? expense['Payment Method'] : '')}" placeholder="Card, cash..." /></div>
       </div>
       <div class="card-row"><span class="label">GST (${((parseFloat(settings['Default GST Rate']) || 0.10) * 100).toFixed(0)}%)</span><span class="value" id="exp-gst-preview">${expMoney(expense ? expense['GST Amount'] : 0)}</span></div>
@@ -182,8 +193,8 @@ async function showExpenseForm(expense) {
       <div id="recurring-fields">${recurringFieldsHtml(expense)}</div>
 
       <div class="field">
-        <label>Receipt Photo</label>
-        <input id="receipt-input" type="file" accept="image/*" capture="environment" />
+        <label>Receipt Photo or File</label>
+        <input id="receipt-input" type="file" accept="image/*,application/pdf" />
         <div id="receipt-preview" style="margin-top:8px">
           ${expense && expense['Receipt Link'] ? `<a href="${escapeHtml(expense['Receipt Link'])}" target="_blank">📎 View current receipt</a>` : ''}
         </div>
@@ -203,12 +214,32 @@ async function showExpenseForm(expense) {
 
   const gstRate = parseFloat(settings['Default GST Rate']) || 0.10;
   const amountInput = document.getElementById('exp-amount');
-  amountInput.addEventListener('input', () => {
+  const amountLabel = document.getElementById('exp-amount-label');
+  function currentGstMode() {
+    return document.getElementById('gst-mode-inclusive').checked ? 'inclusive' : 'exclusive';
+  }
+  function updateAmountPreview() {
     const amt = parseFloat(amountInput.value) || 0;
-    const gst = Math.round(amt * gstRate * 100) / 100;
+    const mode = currentGstMode();
+    let exGst, gst, total;
+    if (mode === 'inclusive') {
+      exGst = Math.round((amt / (1 + gstRate)) * 100) / 100;
+      gst = Math.round((amt - exGst) * 100) / 100;
+      total = amt;
+      amountLabel.textContent = 'Amount incl. GST ($)';
+    } else {
+      exGst = amt;
+      gst = Math.round(amt * gstRate * 100) / 100;
+      total = Math.round((amt + gst) * 100) / 100;
+      amountLabel.textContent = 'Amount excl. GST ($)';
+    }
     document.getElementById('exp-gst-preview').textContent = expMoney(gst);
-    document.getElementById('exp-total-preview').textContent = expMoney(amt + gst);
-  });
+    document.getElementById('exp-total-preview').textContent = expMoney(total);
+  }
+  amountInput.addEventListener('input', updateAmountPreview);
+  document.getElementById('gst-mode-exclusive').addEventListener('change', updateAmountPreview);
+  document.getElementById('gst-mode-inclusive').addEventListener('change', updateAmountPreview);
+  updateAmountPreview();
 
   document.getElementById('expense-category').addEventListener('change', (e) => {
     document.getElementById('category-extra-fields').innerHTML = categoryExtraFieldsHtml(e.target.value, expense, contractors);
@@ -221,10 +252,10 @@ async function showExpenseForm(expense) {
   receiptInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    document.getElementById('receipt-preview').innerHTML = '<span class="li-sub">Processing photo…</span>';
+    document.getElementById('receipt-preview').innerHTML = '<span class="li-sub">Processing file…</span>';
     try {
-      pendingReceipt = await compressImageToBase64(file);
-      document.getElementById('receipt-preview').innerHTML = `<span class="li-sub">✅ Photo ready to attach (${pendingReceipt.fileName})</span>`;
+      pendingReceipt = await processReceiptFile(file);
+      document.getElementById('receipt-preview').innerHTML = `<span class="li-sub">✅ File ready to attach (${pendingReceipt.fileName})</span>`;
     } catch (err) {
       document.getElementById('receipt-preview').innerHTML = `<span class="li-sub">Couldn't process photo: ${err.message}</span>`;
     }
@@ -289,7 +320,25 @@ function wireRecurringToggle() {
  * before upload, since raw phone camera photos (3-10MB) are overkill for
  * a receipt and would make every expense save slow on-site.
  */
-function compressImageToBase64(file) {
+function processReceiptFile(file) {
+  // Non-image files (e.g. a scanned PDF receipt) can't go through canvas
+  // compression — read them as-is.
+  if (!file.type.startsWith('image/')) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve({
+          base64,
+          mimeType: file.type || 'application/octet-stream',
+          fileName: file.name || ('receipt-' + Date.now())
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Could not read file'));
