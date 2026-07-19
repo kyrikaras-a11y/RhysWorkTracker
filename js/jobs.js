@@ -596,14 +596,14 @@ function wireJobDetail(job) {
 }
 
 async function showEmailQuoteForm(job) {
+  document.getElementById('page-container').innerHTML = '<div class="spinner"></div>';
   let customerEmail = '';
   let settings = {};
   try {
-    const customers = await Api.get('getCustomers');
-    const customer = customers.find(c => c['Customer ID'] === job['Customer ID']);
-    if (customer) customerEmail = customer['Email'] || '';
+    const bootstrap = await Api.get('getEmailFormBootstrap', { customerId: job['Customer ID'] });
+    if (bootstrap.customer) customerEmail = bootstrap.customer['Email'] || '';
+    settings = bootstrap.settings || {};
   } catch (e) {}
-  try { settings = await Api.get('getSettings'); } catch (e) {}
 
   const tokens = {
     customerName: job['Customer Name'] || '',
@@ -670,14 +670,14 @@ function wireQuoteLineItemRemoveButtons() {
 // ---------- Email invoice ----------
 
 async function showEmailInvoiceForm(job) {
+  document.getElementById('page-container').innerHTML = '<div class="spinner"></div>';
   let customerEmail = '';
   let settings = {};
   try {
-    const customers = await Api.get('getCustomers');
-    const customer = customers.find(c => c['Customer ID'] === job['Customer ID']);
-    if (customer) customerEmail = customer['Email'] || '';
+    const bootstrap = await Api.get('getEmailFormBootstrap', { customerId: job['Customer ID'] });
+    if (bootstrap.customer) customerEmail = bootstrap.customer['Email'] || '';
+    settings = bootstrap.settings || {};
   } catch (e) {}
-  try { settings = await Api.get('getSettings'); } catch (e) {}
 
   const tokens = {
     customerName: job['Customer Name'] || '',
