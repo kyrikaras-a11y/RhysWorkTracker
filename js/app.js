@@ -107,12 +107,11 @@ function showAddCustomerForm() {
   document.getElementById('page-container').innerHTML = `
     <h1>New Customer</h1>
     <form id="customer-form">
-      <div class="field"><label>Customer Name</label><input name="customerName" required /></div>
+      <div class="field"><label>Customer Name <span style="font-weight:400;text-transform:none">— give a Customer Name and/or Business Name below</span></label><input name="customerName" /></div>
       <div class="field"><label>Business Name</label><input name="businessName" /></div>
       <div class="field"><label>Phone</label><input name="phone" type="tel" /></div>
       <div class="field"><label>Email</label><input name="email" type="email" /></div>
       <div class="field"><label>Billing Address</label><textarea name="billingAddress"></textarea></div>
-      <div class="field"><label>Job Address</label><textarea name="jobAddress"></textarea></div>
       <div class="field"><label>Hourly Rate ($) <span style="font-weight:400;text-transform:none">— used to prefill timesheets for this customer</span></label><input name="hourlyRate" type="number" step="0.01" placeholder="Leave blank to use your default rate" /></div>
       <div class="field"><label>Notes</label><textarea name="notes"></textarea></div>
       <button class="btn btn-primary btn-block" type="submit">Save Customer</button>
@@ -124,6 +123,10 @@ function showAddCustomerForm() {
   document.getElementById('customer-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target).entries());
+    if (!data.customerName.trim() && !data.businessName.trim()) {
+      Toast.show('Enter a Customer Name or Business Name');
+      return;
+    }
     try {
       await Api.post('createCustomer', data);
       Toast.show('Customer saved');
@@ -141,13 +144,12 @@ function showEditCustomerForm(customer) {
       <h1 style="margin:0">Edit Customer</h1>
     </div>
     <form id="customer-edit-form">
-      <div class="field"><label>Customer Name</label><input name="customerName" value="${escapeHtml(customer['Customer Name'] || '')}" required /></div>
+      <div class="field"><label>Customer Name</label><input name="customerName" value="${escapeHtml(customer['Customer Name'] || '')}" /></div>
       <div class="field"><label>Business Name</label><input name="businessName" value="${escapeHtml(customer['Business Name'] || '')}" /></div>
       <div class="field"><label>Contact Person</label><input name="contactPerson" value="${escapeHtml(customer['Contact Person'] || '')}" /></div>
       <div class="field"><label>Phone</label><input name="phone" type="tel" value="${escapeHtml(customer['Phone'] || '')}" /></div>
       <div class="field"><label>Email</label><input name="email" type="email" value="${escapeHtml(customer['Email'] || '')}" /></div>
       <div class="field"><label>Billing Address</label><textarea name="billingAddress">${escapeHtml(customer['Billing Address'] || '')}</textarea></div>
-      <div class="field"><label>Job Address</label><textarea name="jobAddress">${escapeHtml(customer['Job Address'] || '')}</textarea></div>
       <div class="field"><label>Hourly Rate ($) <span style="font-weight:400;text-transform:none">— used to prefill timesheets for this customer</span></label><input name="hourlyRate" type="number" step="0.01" value="${customer['Hourly Rate'] !== undefined && customer['Hourly Rate'] !== '' ? customer['Hourly Rate'] : ''}" placeholder="Leave blank to use your default rate" /></div>
       <div class="field"><label>Notes</label><textarea name="notes">${escapeHtml(customer['Notes'] || '')}</textarea></div>
       <button class="btn btn-primary btn-block" type="submit">Save Changes</button>
@@ -174,6 +176,10 @@ function showEditCustomerForm(customer) {
   document.getElementById('customer-edit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.target).entries());
+    if (!data.customerName.trim() && !data.businessName.trim()) {
+      Toast.show('Enter a Customer Name or Business Name');
+      return;
+    }
     data.customerId = customer['Customer ID'];
     try {
       await Api.post('updateCustomer', data);
@@ -239,6 +245,7 @@ Router.register('settings', async () => {
       <div class="field"><label>Default GST Rate</label><input id="s-gst" value="${escapeHtml(settings['Default GST Rate'] || '0.10')}" /></div>
       <div class="field"><label>Default Hourly Rate ($)</label><input id="s-hourly-rate" type="number" step="0.01" value="${escapeHtml(settings['Default Hourly Rate'] || '65')}" /></div>
       <div class="field"><label>Trade Licence Number <span style="font-weight:400;text-transform:none">— shown on quotes & invoices</span></label><input id="s-licence-number" value="${escapeHtml(settings['Licence Number'] || '')}" /></div>
+      <div class="field"><label>Overdue Notification Email <span style="font-weight:400;text-transform:none">— sent to you, never the client</span></label><input id="s-notification-email" type="email" value="${escapeHtml(settings['Notification Email'] || '')}" placeholder="Defaults to your business email above" /></div>
       <div class="field-row">
         <div class="field"><label>Invoice Payment Terms (days)</label><input id="s-invoice-terms-days" type="number" value="${escapeHtml(settings['Invoice Payment Terms (days)'] || '14')}" /></div>
         <div class="field"><label>Quote Validity (days)</label><input id="s-quote-validity-days" type="number" value="${escapeHtml(settings['Quote Validity (days)'] || '30')}" /></div>
@@ -302,6 +309,7 @@ function wireSettingsPage() {
         'Default GST Rate': document.getElementById('s-gst').value,
         'Default Hourly Rate': document.getElementById('s-hourly-rate').value,
         'Licence Number': document.getElementById('s-licence-number').value,
+        'Notification Email': document.getElementById('s-notification-email').value,
         'Invoice Payment Terms (days)': document.getElementById('s-invoice-terms-days').value,
         'Quote Validity (days)': document.getElementById('s-quote-validity-days').value,
         'Bank Account Name': document.getElementById('s-bank-name').value,
