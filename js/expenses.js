@@ -189,6 +189,11 @@ async function showExpenseForm(expense) {
       <div class="card-row"><span class="label">GST (${((parseFloat(settings['Default GST Rate']) || 0.10) * 100).toFixed(0)}%)</span><span class="value" id="exp-gst-preview">${expMoney(expense ? expense['GST Amount'] : 0)}</span></div>
       <div class="card-row"><span class="label">Total incl. GST</span><span class="value" id="exp-total-preview">${expMoney(expense ? expense['Total Amount'] : 0)}</span></div>
 
+      <div class="field" style="margin-top:10px">
+        <label>Amount to Charge Customer ($) <span style="font-weight:400;text-transform:none">— optional, only if different from what you paid. Used when adding this as an invoice line item.</span></label>
+        <input id="exp-charge-amount" name="chargeAmount" type="number" step="0.01" value="${expense && expense['Charge Amount'] !== '' && expense['Charge Amount'] !== undefined ? expense['Charge Amount'] : ''}" placeholder="Leave blank to bill the same as cost" />
+      </div>
+
       <div id="category-extra-fields">${categoryExtraFieldsHtml(category, expense, contractors)}</div>
       <div id="recurring-fields">${recurringFieldsHtml(expense)}</div>
 
@@ -390,19 +395,28 @@ async function showExpensePickerForInvoice(jobId) {
     return;
   }
 
-  const totalAmount = entries.reduce((s, e) => s + (parseFloat(e['Amount Ex GST']) || 0), 0);
+  const billAmountFor = e => {
+    const charge = e['Charge Amount'];
+    return (charge !== '' && charge !== undefined && charge !== null) ? parseFloat(charge) : (parseFloat(e['Amount Ex GST']) || 0);
+  };
 
-  const rows = entries.map(e => `
+  const totalAmount = entries.reduce((s, e) => s + billAmountFor(e), 0);
+
+  const rows = entries.map(e => {
+    const billAmount = billAmountFor(e);
+    const hasCustomCharge = e['Charge Amount'] !== '' && e['Charge Amount'] !== undefined && e['Charge Amount'] !== null;
+    return `
     <div class="list-item">
       <label style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer">
-        <input type="checkbox" class="exp-pick" data-exp-id="${escapeHtml(e['Expense ID'])}" data-amount="${e['Amount Ex GST']}" data-desc="${escapeHtml(e['Description'] || e['Supplier'] || 'Materials')}" data-date="${formatDate(e['Date'])}" checked style="width:20px;height:20px" />
+        <input type="checkbox" class="exp-pick" data-exp-id="${escapeHtml(e['Expense ID'])}" data-amount="${billAmount}" data-desc="${escapeHtml(e['Description'] || e['Supplier'] || 'Materials')}" data-date="${formatDate(e['Date'])}" checked style="width:20px;height:20px" />
         <div class="li-main" style="flex:1">
-          <div class="li-title">${formatDate(e['Date'])} — ${expMoney(e['Amount Ex GST'])}</div>
+          <div class="li-title">${formatDate(e['Date'])} — ${expMoney(billAmount)}${hasCustomCharge ? ` <span style="color:var(--text-muted);font-weight:400">(cost was ${expMoney(e['Amount Ex GST'])})</span>` : ''}</div>
           <div class="li-sub">${escapeHtml(e['Category'])} · ${escapeHtml(e['Supplier'] || '')} · ${escapeHtml(e['Description'] || '')}</div>
         </div>
       </label>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   document.getElementById('page-container').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
