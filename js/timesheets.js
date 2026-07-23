@@ -8,6 +8,14 @@
 let tsViewMode = 'calendar';
 let tsCurrentMonth = new Date();
 
+function tsAmountLabel(e) {
+  if (e['Entry Type'] === 'Day Rate') {
+    const amt = parseFloat(e['Day Rate Amount']) || 0;
+    return '$' + amt.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return (e['Hours'] || 0) + 'h';
+}
+
 function monthKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function monthLabel(d) { return d.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }); }
 
@@ -85,7 +93,7 @@ function renderTsList(entries) {
         <div class="li-sub">${escapeHtml(e['Job ID'] || 'No job yet')} — ${escapeHtml(e['Description'] || '')}</div>
       </div>
       <div style="text-align:right">
-        <div class="li-amount">${e['Hours']}h</div>
+        <div class="li-amount">${tsAmountLabel(e)}</div>
         ${e['Invoiced'] === true || e['Invoiced'] === 'TRUE' ? `<span class="badge badge-paid">Invoiced</span>` : ''}
       </div>
     </div>
@@ -145,7 +153,7 @@ function showDayDetail(day) {
         <div class="li-title">${escapeHtml(e['Job ID'])} — ${escapeHtml(e['Customer Name'] || '')}</div>
         <div class="li-sub">${escapeHtml(e['Start Time'] || '')} – ${escapeHtml(e['End Time'] || '')} · ${escapeHtml(e['Description'] || '')}</div>
       </div>
-      <div class="li-amount">${e['Hours']}h</div>
+      <div class="li-amount">${tsAmountLabel(e)}</div>
     </div>
   `).join('');
   const panel = document.getElementById('cal-day-detail');
@@ -223,22 +231,36 @@ async function showTimesheetForm(entry, prefillDate) {
     <form id="ts-form">
       <div class="field"><label>Job</label><select id="ts-job" name="jobId">${jobOptions}</select></div>
       <div class="field"><label>Date</label><input name="date" type="date" value="${dateVal}" required /></div>
-      <div class="field-row">
-        <div class="field"><label>Start Time</label><input id="ts-start" name="startTime" type="time" value="${escapeHtml(entry ? entry['Start Time'] : '')}" /></div>
-        <div class="field"><label>End Time</label><input id="ts-end" name="endTime" type="time" value="${escapeHtml(entry ? entry['End Time'] : '')}" /></div>
+
+      <div class="tab-strip" id="entry-type-tabs">
+        <button type="button" data-type="Hourly" class="${(!entry || entry['Entry Type'] !== 'Day Rate') ? 'active' : ''}">🕒 Hourly</button>
+        <button type="button" data-type="Day Rate" class="${(entry && entry['Entry Type'] === 'Day Rate') ? 'active' : ''}">💰 Day Rate</button>
       </div>
-      <div class="field">
-        <label>Break</label>
-        <div class="tab-strip" id="break-quick-picks" style="margin-bottom:8px">
-          <button type="button" data-mins="0" class="${existingBreak === 0 ? 'active' : ''}">No break</button>
-          <button type="button" data-mins="30" class="${existingBreak === 30 ? 'active' : ''}">30 min</button>
-          <button type="button" data-mins="60" class="${existingBreak === 60 ? 'active' : ''}">1 hr</button>
-          <button type="button" data-mins="custom" class="${[0,30,60].indexOf(existingBreak) === -1 ? 'active' : ''}">Custom</button>
+      <input type="hidden" id="ts-entry-type" name="entryType" value="${entry && entry['Entry Type'] === 'Day Rate' ? 'Day Rate' : 'Hourly'}" />
+
+      <div id="hourly-fields" style="${entry && entry['Entry Type'] === 'Day Rate' ? 'display:none' : ''}">
+        <div class="field-row">
+          <div class="field"><label>Start Time</label><input id="ts-start" name="startTime" type="time" value="${escapeHtml(entry ? entry['Start Time'] : '')}" /></div>
+          <div class="field"><label>End Time</label><input id="ts-end" name="endTime" type="time" value="${escapeHtml(entry ? entry['End Time'] : '')}" /></div>
         </div>
-        <input id="ts-break" name="breakMinutes" type="number" step="1" value="${existingBreak}" placeholder="Break in minutes" />
+        <div class="field">
+          <label>Break</label>
+          <div class="tab-strip" id="break-quick-picks" style="margin-bottom:8px">
+            <button type="button" data-mins="0" class="${existingBreak === 0 ? 'active' : ''}">No break</button>
+            <button type="button" data-mins="30" class="${existingBreak === 30 ? 'active' : ''}">30 min</button>
+            <button type="button" data-mins="60" class="${existingBreak === 60 ? 'active' : ''}">1 hr</button>
+            <button type="button" data-mins="custom" class="${[0,30,60].indexOf(existingBreak) === -1 ? 'active' : ''}">Custom</button>
+          </div>
+          <input id="ts-break" name="breakMinutes" type="number" step="1" value="${existingBreak}" placeholder="Break in minutes" />
+        </div>
+        <div class="card-row"><span class="label">Hours (auto-calculated)</span><span class="value" id="ts-hours-preview">${entry ? entry['Hours'] : '0'}h</span></div>
+        <div class="field"><label>Hourly Rate ($)</label><input id="ts-rate" name="hourlyRate" type="number" step="0.01" value="${entry ? entry['Hourly Rate'] : rateForJob(visibleJobs[0] && visibleJobs[0]['Job ID'])}" /></div>
       </div>
-      <div class="card-row"><span class="label">Hours (auto-calculated)</span><span class="value" id="ts-hours-preview">${entry ? entry['Hours'] : '0'}h</span></div>
-      <div class="field"><label>Hourly Rate ($)</label><input id="ts-rate" name="hourlyRate" type="number" step="0.01" value="${entry ? entry['Hourly Rate'] : rateForJob(visibleJobs[0] && visibleJobs[0]['Job ID'])}" /></div>
+
+      <div id="day-rate-fields" style="${entry && entry['Entry Type'] === 'Day Rate' ? '' : 'display:none'}">
+        <div class="field"><label>Total Amount for the Day ($)</label><input id="ts-day-rate" name="dayRateAmount" type="number" step="0.01" value="${entry ? entry['Day Rate Amount'] || '' : ''}" /></div>
+      </div>
+
       <div class="field"><label>Description</label><input name="description" value="${escapeHtml(entry ? entry['Description'] : '')}" placeholder="e.g. Site work, install..." /></div>
       <div class="field"><label>Notes</label><textarea name="notes">${escapeHtml(entry ? entry['Notes'] : '')}</textarea></div>
       <button class="btn btn-primary btn-block" type="submit">${entry ? 'Save Changes' : 'Save Entry'}</button>
@@ -252,6 +274,17 @@ async function showTimesheetForm(entry, prefillDate) {
   document.getElementById('back-to-ts').addEventListener('click', () => navigateAndWire('timesheets'));
 
   if (isInvoiced) return;
+
+  document.querySelectorAll('#entry-type-tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#entry-type-tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('ts-entry-type').value = btn.dataset.type;
+      const isDayRate = btn.dataset.type === 'Day Rate';
+      document.getElementById('hourly-fields').style.display = isDayRate ? 'none' : '';
+      document.getElementById('day-rate-fields').style.display = isDayRate ? '' : 'none';
+    });
+  });
 
   const startInput = document.getElementById('ts-start');
   const endInput = document.getElementById('ts-end');
@@ -362,24 +395,32 @@ async function showTimesheetPickerForInvoice(jobId) {
     return;
   }
 
-  const totalHours = entries.reduce((s, e) => s + (parseFloat(e['Hours']) || 0), 0);
-  const totalAmount = entries.reduce((s, e) => s + (parseFloat(e['Hours']) || 0) * (parseFloat(e['Hourly Rate']) || 0), 0);
+  const totalHours = entries.reduce((s, e) => s + (e['Entry Type'] === 'Day Rate' ? 0 : (parseFloat(e['Hours']) || 0)), 0);
+  const totalAmount = entries.reduce((s, e) => {
+    if (e['Entry Type'] === 'Day Rate') return s + (parseFloat(e['Day Rate Amount']) || 0);
+    return s + (parseFloat(e['Hours']) || 0) * (parseFloat(e['Hourly Rate']) || 0);
+  }, 0);
 
-  const rows = entries.map(e => `
+  const rows = entries.map(e => {
+    const isDayRate = e['Entry Type'] === 'Day Rate';
+    const amount = isDayRate ? (parseFloat(e['Day Rate Amount']) || 0) : (parseFloat(e['Hours']) || 0) * (parseFloat(e['Hourly Rate']) || 0);
+    return `
     <div class="list-item">
       <label style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer">
-        <input type="checkbox" class="ts-pick" data-ts-id="${e['Timesheet ID']}" data-hours="${e['Hours']}" data-rate="${e['Hourly Rate']}" data-desc="${escapeHtml(e['Description'] || '')}" data-date="${formatDate(e['Date'])}" checked style="width:20px;height:20px" />
+        <input type="checkbox" class="ts-pick" data-ts-id="${e['Timesheet ID']}" data-entry-type="${isDayRate ? 'Day Rate' : 'Hourly'}" data-hours="${e['Hours']}" data-rate="${e['Hourly Rate']}" data-day-rate-amount="${e['Day Rate Amount'] || 0}" data-desc="${escapeHtml(e['Description'] || '')}" data-date="${formatDate(e['Date'])}" checked style="width:20px;height:20px" />
         <div class="li-main" style="flex:1">
-          <div class="li-title">${formatDate(e['Date'])} — ${e['Hours']}h</div>
+          <div class="li-title">${formatDate(e['Date'])} — ${isDayRate ? '💰 Day rate: $' + amount.toFixed(2) : e['Hours'] + 'h'}</div>
           <div class="li-sub">${escapeHtml(e['Description'] || '')}</div>
         </div>
       </label>
+      ${isDayRate ? '' : `
       <label class="ts-show-hours-wrap" style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text-muted);white-space:nowrap;cursor:pointer">
         <input type="checkbox" class="ts-show-hours" data-ts-id="${e['Timesheet ID']}" checked style="width:16px;height:16px" />
         Show hrs
-      </label>
+      </label>`}
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   document.getElementById('page-container').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -387,12 +428,12 @@ async function showTimesheetPickerForInvoice(jobId) {
       <h1 style="margin:0">Add from Timesheets</h1>
     </div>
     <div class="card">${rows}</div>
-    <p style="margin-top:-6px">Untick "Show hrs" on any day to bill it as a flat amount instead of hours × rate — handy for a quoted job where you don't want the hours visible for that entry.</p>
+    <p style="margin-top:-6px">Untick "Show hrs" on any hourly day to bill it as a flat amount instead — day rate entries always bill as a flat amount, no hours shown.</p>
 
     <div class="card">
       <h3>Combine into one line?</h3>
       <div class="field">
-        <label><input type="radio" name="ts-mode" value="breakdown" checked /> Keep as separate lines (one per day, using the "Show hrs" setting above)</label>
+        <label><input type="radio" name="ts-mode" value="breakdown" checked /> Keep as separate lines (one per day)</label>
       </div>
       <div class="field">
         <label><input type="radio" name="ts-mode" value="lumpsum" /> Combine everything into a single lump sum line</label>
@@ -400,7 +441,7 @@ async function showTimesheetPickerForInvoice(jobId) {
       <div id="lumpsum-fields" style="display:none">
         <div class="field"><label>Line description</label><input id="lumpsum-desc" value="Labour" /></div>
         <div class="field"><label>Total amount ($)</label><input id="lumpsum-amount" type="number" step="0.01" value="${totalAmount.toFixed(2)}" /></div>
-        <p>Suggested total is ${totalHours}h × rate. Edit freely — e.g. enter your quoted price instead.</p>
+        <p>Suggested total is ${totalHours}h × rate, plus any day-rate amounts. Edit freely — e.g. enter your quoted price instead.</p>
       </div>
     </div>
 
@@ -434,8 +475,11 @@ async function showTimesheetPickerForInvoice(jobId) {
     let pendingLines;
     if (mode === 'breakdown') {
       pendingLines = checked.map(c => {
-        const showHours = showHoursMap[c.dataset.tsId];
         const label = `${c.dataset.date} — ${c.dataset.desc || 'Labour'}`;
+        if (c.dataset.entryType === 'Day Rate') {
+          return { description: label, quantity: 1, unitPrice: c.dataset.dayRateAmount, sourceType: 'Timesheet', sourceId: c.dataset.tsId };
+        }
+        const showHours = showHoursMap[c.dataset.tsId];
         if (showHours) {
           return { description: label, quantity: c.dataset.hours, unitPrice: c.dataset.rate, sourceType: 'Timesheet', sourceId: c.dataset.tsId };
         }
