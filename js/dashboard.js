@@ -52,6 +52,21 @@ function renderDashboard(data) {
       <div class="card-row"><span class="label">Outstanding (Sent / Part Paid)</span><span class="value">${data.income.outstandingInvoices.count} · ${dbMoney(data.income.outstandingInvoices.amount)}</span></div>
     </div>
 
+    ${data.income.overdueList && data.income.overdueList.length ? `
+    <h3 style="margin-top:20px">Overdue Invoices</h3>
+    <div id="overdue-list">
+      ${data.income.overdueList.map(o => `
+        <div class="list-item" data-job-id="${escapeHtml(o.jobId)}">
+          <div class="li-main">
+            <div class="li-title">${escapeHtml(o.customerName)} — ${escapeHtml(o.invoiceNumber)}</div>
+            <div class="li-sub">Due ${formatDate(o.dueDate)}</div>
+          </div>
+          <div class="li-amount negative">${dbMoney(o.remaining)}</div>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+
     <h3 style="margin-top:20px">Expenses</h3>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-label">This Month</div><div class="stat-value">${dbMoney(data.expenses.thisMonth)}</div></div>
@@ -97,6 +112,11 @@ function renderDashboard(data) {
 
 function wireDashboardPage() {
   const data = window._dashboardData;
+
+  document.querySelectorAll('#overdue-list .list-item').forEach(item => {
+    item.addEventListener('click', () => showJobDetail(item.dataset.jobId));
+  });
+
   if (!data || typeof Chart === 'undefined') return;
 
   // destroy any previous chart instances before re-rendering, to avoid canvas reuse errors
