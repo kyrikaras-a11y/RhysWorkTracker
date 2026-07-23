@@ -243,6 +243,17 @@ function renderJobDetail(job) {
         </table>
         <button class="btn btn-secondary btn-block" id="add-quote-line-item-btn" type="button">+ Add Line Item</button>
         <div style="height:10px"></div>
+        <div class="field">
+          <label>Prices entered above are</label>
+          <div style="display:flex;gap:16px;padding:4px 0">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer">
+              <input type="radio" name="quoteGstMode" value="exclusive" id="quote-gst-exclusive" ${job['Quote GST Mode'] !== 'inclusive' ? 'checked' : ''} /> Excl. GST
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer">
+              <input type="radio" name="quoteGstMode" value="inclusive" id="quote-gst-inclusive" ${job['Quote GST Mode'] === 'inclusive' ? 'checked' : ''} /> Incl. GST
+            </label>
+          </div>
+        </div>
         <button class="btn btn-primary btn-block" id="save-quote-line-items-btn" type="button">Save Line Items</button>
 
         <div style="margin-top:14px">
@@ -312,7 +323,22 @@ function renderJobDetail(job) {
         <button class="btn btn-secondary btn-block" id="add-from-timesheets-btn" type="button">🕒 Add from Timesheets</button>
         <div style="height:10px"></div>
         <button class="btn btn-secondary btn-block" id="add-from-expenses-btn" type="button">📦 Add from Expenses</button>
+        ${(job['Quote Subtotal'] || job['Quote Amount']) ? `
         <div style="height:10px"></div>
+        <button class="btn btn-secondary btn-block" id="add-quote-total-btn" type="button">💰 Add Quote Amount as Line Item</button>
+        ` : ''}
+        <div style="height:10px"></div>
+        <div class="field">
+          <label>Prices entered above are</label>
+          <div style="display:flex;gap:16px;padding:4px 0">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer">
+              <input type="radio" name="invoiceGstMode" value="exclusive" id="invoice-gst-exclusive" ${job['Invoice GST Mode'] !== 'inclusive' ? 'checked' : ''} /> Excl. GST
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer">
+              <input type="radio" name="invoiceGstMode" value="inclusive" id="invoice-gst-inclusive" ${job['Invoice GST Mode'] === 'inclusive' ? 'checked' : ''} /> Incl. GST
+            </label>
+          </div>
+        </div>
         <button class="btn btn-primary btn-block" id="save-line-items-btn" type="button">Save Line Items</button>
 
         <div style="margin-top:14px">
@@ -330,6 +356,8 @@ function renderJobDetail(job) {
         </div>
         <div class="card-row"><span class="label">Remaining Balance</span><span class="value">${money(job['Remaining Balance'])}</span></div>
         <button class="btn btn-primary btn-block" id="record-payment-btn">Record Payment</button>
+        <div style="height:10px"></div>
+        <button class="btn btn-secondary btn-block" id="mark-paid-full-btn">✅ Mark Paid in Full</button>
 
         <div style="height:16px"></div>
         <h3>PDF & Email</h3>
@@ -406,8 +434,9 @@ function wireJobDetail(job) {
         quantity: row.querySelector('.qli-qty').value,
         unitPrice: row.querySelector('.qli-price').value
       })).filter(li => li.description.trim() !== '');
+      const gstMode = document.getElementById('quote-gst-inclusive').checked ? 'inclusive' : 'exclusive';
       try {
-        await Api.post('saveQuoteLineItems', { jobId: job['Job ID'], lineItems });
+        await Api.post('saveQuoteLineItems', { jobId: job['Job ID'], lineItems, gstMode });
         Toast.show('Quote line items saved');
         showJobDetail(job['Job ID']);
       } catch (err) {
@@ -555,13 +584,28 @@ function wireJobDetail(job) {
         sourceType: row.dataset.sourceType || '',
         sourceId: row.dataset.sourceId || ''
       })).filter(li => li.description.trim() !== '');
+      const gstMode = document.getElementById('invoice-gst-inclusive').checked ? 'inclusive' : 'exclusive';
       try {
-        await Api.post('saveLineItems', { jobId: job['Job ID'], lineItems });
+        await Api.post('saveLineItems', { jobId: job['Job ID'], lineItems, gstMode });
         Toast.show('Line items saved');
         showJobDetail(job['Job ID']);
       } catch (err) {
         Toast.show('Error: ' + err.message);
       }
+    });
+  }
+
+  const addQuoteTotalBtn = document.getElementById('add-quote-total-btn');
+  if (addQuoteTotalBtn) {
+    addQuoteTotalBtn.addEventListener('click', () => {
+      const amount = parseFloat(job['Quote Subtotal']) || parseFloat(job['Quote Amount']) || 0;
+      if (!amount) { Toast.show('No quote amount to add'); return; }
+      window._pendingQuoteLines = [{
+        description: job['Job Description'] || 'Quoted work',
+        quantity: 1,
+        unitPrice: amount
+      }];
+      showJobDetail(job['Job ID']);
     });
   }
 
@@ -579,6 +623,28 @@ function wireJobDetail(job) {
         showJobDetail(job['Job ID']);
       } catch (err) {
         Toast.show('Error: ' + err.message);
+      }
+    });
+  }
+
+  const markPaidFullBtn = document.getElementById('mark-paid-full-btn');
+  if (markPaidFullBtn) {
+    markPaidFullBtn.addEventListener('click', async () => {
+      markPaidFullBtn.disabled = true;
+      markPaidFullBtn.textContent = 'Marking as paid...';
+      try {
+        await Api.post('recordPayment', {
+          jobId: job['Job ID'],
+          amountPaid: job['Total Amount'],
+          paymentMethod: document.getElementById('payment-method').value,
+          paymentReference: document.getElementById('payment-reference').value
+        });
+        Toast.show('Marked as paid in full');
+        showJobDetail(job['Job ID']);
+      } catch (err) {
+        Toast.show('Error: ' + err.message);
+        markPaidFullBtn.disabled = false;
+        markPaidFullBtn.textContent = '✅ Mark Paid in Full';
       }
     });
   }
