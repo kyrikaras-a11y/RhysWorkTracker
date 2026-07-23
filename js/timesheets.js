@@ -24,6 +24,8 @@ function renderTimesheetsPage(entries) {
       <button data-view="calendar" class="${tsViewMode === 'calendar' ? 'active' : ''}">📅 Calendar</button>
       <button data-view="list" class="${tsViewMode === 'list' ? 'active' : ''}">☰ List</button>
     </div>
+    <button class="btn btn-secondary btn-block" id="create-job-from-ts-btn">📄 Create Job & Invoice from Timesheets</button>
+    <div style="height:12px"></div>
     ${tsViewMode === 'calendar' ? renderCalendar(entries) : renderTsList(entries)}
     <button class="fab" id="add-ts-fab">+</button>
   `;
@@ -79,8 +81,8 @@ function renderTsList(entries) {
   const rows = entries.map(e => `
     <div class="list-item" data-ts-id="${e['Timesheet ID']}">
       <div class="li-main">
-        <div class="li-title">${formatDate(e['Date'])} · ${escapeHtml(e['Customer Name'] || '')}</div>
-        <div class="li-sub">${escapeHtml(e['Job ID'])} — ${escapeHtml(e['Description'] || '')}</div>
+        <div class="li-title">${formatDate(e['Date'])} · ${escapeHtml(e['Customer Name'] || (e['Job ID'] ? '' : 'Unassigned'))}</div>
+        <div class="li-sub">${escapeHtml(e['Job ID'] || 'No job yet')} — ${escapeHtml(e['Description'] || '')}</div>
       </div>
       <div style="text-align:right">
         <div class="li-amount">${e['Hours']}h</div>
@@ -94,6 +96,9 @@ function renderTsList(entries) {
 // ---------- Wiring ----------
 
 function wireTimesheetsPage() {
+  const createJobBtn = document.getElementById('create-job-from-ts-btn');
+  if (createJobBtn) createJobBtn.addEventListener('click', showCreateJobFromTimesheetsFlow);
+
   document.querySelectorAll('.tab-strip button[data-view]').forEach(btn => {
     btn.addEventListener('click', () => {
       tsViewMode = btn.dataset.view;
@@ -182,7 +187,11 @@ async function showTimesheetForm(entry, prefillDate) {
   }
 
   const isInvoiced = entry && (entry['Invoiced'] === true || entry['Invoiced'] === 'TRUE');
-  const jobOptions = jobs.map(j =>
+  const hiddenStatuses = ['Invoiced', 'Paid', 'Cancelled'];
+  const visibleJobs = jobs.filter(j =>
+    hiddenStatuses.indexOf(j['Job Status']) === -1 || (entry && entry['Job ID'] === j['Job ID'])
+  );
+  const jobOptions = `<option value="">— No job yet (invoice later) —</option>` + visibleJobs.map(j =>
     `<option value="${escapeHtml(j['Job ID'])}" ${entry && entry['Job ID'] === j['Job ID'] ? 'selected' : ''}>${escapeHtml(jobDropdownLabel(j))}</option>`
   ).join('');
 
@@ -203,6 +212,7 @@ async function showTimesheetForm(entry, prefillDate) {
   }
 
   const dateVal = entry ? formatDateForInput(entry['Date']) : (prefillDate || formatDateForInput(new Date()));
+  const existingBreak = entry ? (parseFloat(entry['Break Minutes']) || 0) : 0;
 
   document.getElementById('page-container').innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -211,14 +221,24 @@ async function showTimesheetForm(entry, prefillDate) {
     </div>
     ${isInvoiced ? `<div class="card"><p>This entry is on invoice <strong>${escapeHtml(entry['Invoice Number'])}</strong> and can't be edited. Remove it from the invoice's line items first if you need to change it.</p></div>` : `
     <form id="ts-form">
-      <div class="field"><label>Job</label><select id="ts-job" name="jobId" required>${jobOptions}</select></div>
+      <div class="field"><label>Job</label><select id="ts-job" name="jobId">${jobOptions}</select></div>
       <div class="field"><label>Date</label><input name="date" type="date" value="${dateVal}" required /></div>
       <div class="field-row">
         <div class="field"><label>Start Time</label><input id="ts-start" name="startTime" type="time" value="${escapeHtml(entry ? entry['Start Time'] : '')}" /></div>
         <div class="field"><label>End Time</label><input id="ts-end" name="endTime" type="time" value="${escapeHtml(entry ? entry['End Time'] : '')}" /></div>
       </div>
+      <div class="field">
+        <label>Break</label>
+        <div class="tab-strip" id="break-quick-picks" style="margin-bottom:8px">
+          <button type="button" data-mins="0" class="${existingBreak === 0 ? 'active' : ''}">No break</button>
+          <button type="button" data-mins="30" class="${existingBreak === 30 ? 'active' : ''}">30 min</button>
+          <button type="button" data-mins="60" class="${existingBreak === 60 ? 'active' : ''}">1 hr</button>
+          <button type="button" data-mins="custom" class="${[0,30,60].indexOf(existingBreak) === -1 ? 'active' : ''}">Custom</button>
+        </div>
+        <input id="ts-break" name="breakMinutes" type="number" step="1" value="${existingBreak}" placeholder="Break in minutes" />
+      </div>
       <div class="card-row"><span class="label">Hours (auto-calculated)</span><span class="value" id="ts-hours-preview">${entry ? entry['Hours'] : '0'}h</span></div>
-      <div class="field"><label>Hourly Rate ($)</label><input id="ts-rate" name="hourlyRate" type="number" step="0.01" value="${entry ? entry['Hourly Rate'] : rateForJob(jobs[0] && jobs[0]['Job ID'])}" /></div>
+      <div class="field"><label>Hourly Rate ($)</label><input id="ts-rate" name="hourlyRate" type="number" step="0.01" value="${entry ? entry['Hourly Rate'] : rateForJob(visibleJobs[0] && visibleJobs[0]['Job ID'])}" /></div>
       <div class="field"><label>Description</label><input name="description" value="${escapeHtml(entry ? entry['Description'] : '')}" placeholder="e.g. Site work, install..." /></div>
       <div class="field"><label>Notes</label><textarea name="notes">${escapeHtml(entry ? entry['Notes'] : '')}</textarea></div>
       <button class="btn btn-primary btn-block" type="submit">${entry ? 'Save Changes' : 'Save Entry'}</button>
@@ -235,14 +255,34 @@ async function showTimesheetForm(entry, prefillDate) {
 
   const startInput = document.getElementById('ts-start');
   const endInput = document.getElementById('ts-end');
+  const breakInput = document.getElementById('ts-break');
   const preview = document.getElementById('ts-hours-preview');
   function updatePreview() {
     if (startInput.value && endInput.value) {
-      preview.textContent = calcHoursClientSide(startInput.value, endInput.value) + 'h';
+      preview.textContent = calcHoursClientSide(startInput.value, endInput.value, breakInput.value) + 'h';
     }
   }
   startInput.addEventListener('input', updatePreview);
   endInput.addEventListener('input', updatePreview);
+  breakInput.addEventListener('input', () => {
+    document.querySelectorAll('#break-quick-picks button').forEach(b => b.classList.remove('active'));
+    const match = document.querySelector(`#break-quick-picks button[data-mins="${breakInput.value}"]`);
+    if (match) match.classList.add('active');
+    else document.querySelector('#break-quick-picks button[data-mins="custom"]').classList.add('active');
+    updatePreview();
+  });
+  document.querySelectorAll('#break-quick-picks button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#break-quick-picks button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.mins !== 'custom') {
+        breakInput.value = btn.dataset.mins;
+        updatePreview();
+      } else {
+        breakInput.focus();
+      }
+    });
+  });
 
   const jobSelect = document.getElementById('ts-job');
   const rateInput = document.getElementById('ts-rate');
@@ -288,11 +328,13 @@ async function showTimesheetForm(entry, prefillDate) {
   });
 }
 
-function calcHoursClientSide(start, end) {
+function calcHoursClientSide(start, end, breakMinutes) {
   const [sh, sm] = start.split(':').map(Number);
   const [eh, em] = end.split(':').map(Number);
   let diff = (eh * 60 + em) - (sh * 60 + sm);
   if (diff < 0) diff += 24 * 60;
+  diff -= parseFloat(breakMinutes) || 0;
+  if (diff < 0) diff = 0;
   return Math.round((diff / 60) * 100) / 100;
 }
 
@@ -412,5 +454,134 @@ async function showTimesheetPickerForInvoice(jobId) {
 
     window._pendingTimesheetLines = pendingLines;
     showJobDetail(jobId);
+  });
+}
+
+// ---------- Create Job & Invoice from unassigned Timesheets ----------
+
+async function showCreateJobFromTimesheetsFlow() {
+  document.getElementById('page-container').innerHTML = '<div class="spinner"></div>';
+  let entries = [], customers = [];
+  try {
+    [entries, customers] = await Promise.all([
+      Api.get('getUnassignedTimesheets'),
+      Api.get('getCustomers')
+    ]);
+  } catch (e) {}
+
+  if (!entries.length) {
+    document.getElementById('page-container').innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <button class="icon-btn" id="back-to-ts-from-create">←</button>
+        <h1 style="margin:0">Create Job & Invoice</h1>
+      </div>
+      <div class="empty-state">No unassigned timesheet entries.<br>Log some hours with "No job yet" selected first.</div>
+    `;
+    document.getElementById('back-to-ts-from-create').addEventListener('click', () => navigateAndWire('timesheets'));
+    return;
+  }
+
+  const entryRows = entries.map(e => `
+    <div class="list-item">
+      <label style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer">
+        <input type="checkbox" class="unassigned-ts-pick" data-ts-id="${e['Timesheet ID']}" checked style="width:20px;height:20px" />
+        <div class="li-main" style="flex:1">
+          <div class="li-title">${formatDate(e['Date'])} — ${e['Hours']}h</div>
+          <div class="li-sub">${escapeHtml(e['Description'] || '')}</div>
+        </div>
+      </label>
+    </div>
+  `).join('');
+
+  const customerOptions = `<option value="">— Select existing customer —</option>` + customers.map(c =>
+    `<option value="${escapeHtml(c['Customer ID'])}">${escapeHtml(c['Customer Name'] || c['Business Name'])}</option>`
+  ).join('');
+
+  document.getElementById('page-container').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <button class="icon-btn" id="back-to-ts-from-create">←</button>
+      <h1 style="margin:0">Create Job & Invoice</h1>
+    </div>
+    <div class="card">
+      <h3>Select timesheet entries</h3>
+      ${entryRows}
+    </div>
+
+    <div class="card">
+      <h3>Customer</h3>
+      <div class="field"><select id="cj-customer-select">${customerOptions}</select></div>
+      <div class="field">
+        <label><input type="checkbox" id="cj-new-customer-toggle" /> This is a new customer</label>
+      </div>
+      <div id="cj-new-customer-fields" style="display:none">
+        <div class="field"><label>Customer or Business Name</label><input id="cj-new-name" placeholder="At least one required" /></div>
+        <div class="field"><label>Business Name (optional if name given)</label><input id="cj-new-business" /></div>
+        <div class="field-row">
+          <div class="field"><label>Phone</label><input id="cj-new-phone" type="tel" /></div>
+          <div class="field"><label>Email</label><input id="cj-new-email" type="email" /></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Job Details</h3>
+      <div class="field"><label>Job Address</label><textarea id="cj-job-address"></textarea></div>
+      <div class="field"><label>Job Description</label><textarea id="cj-job-description"></textarea></div>
+    </div>
+
+    <button class="btn btn-primary btn-block" id="create-job-submit-btn">Create Job</button>
+    <div style="height:10px"></div>
+    <button class="btn btn-secondary btn-block" id="cancel-create-job-btn">Cancel</button>
+  `;
+
+  document.getElementById('back-to-ts-from-create').addEventListener('click', () => navigateAndWire('timesheets'));
+  document.getElementById('cancel-create-job-btn').addEventListener('click', () => navigateAndWire('timesheets'));
+
+  const newCustomerToggle = document.getElementById('cj-new-customer-toggle');
+  const newCustomerFields = document.getElementById('cj-new-customer-fields');
+  const customerSelect = document.getElementById('cj-customer-select');
+  newCustomerToggle.addEventListener('change', () => {
+    newCustomerFields.style.display = newCustomerToggle.checked ? 'block' : 'none';
+    customerSelect.disabled = newCustomerToggle.checked;
+  });
+
+  document.getElementById('create-job-submit-btn').addEventListener('click', async () => {
+    const checked = Array.from(document.querySelectorAll('.unassigned-ts-pick:checked'));
+    if (!checked.length) { Toast.show('Select at least one timesheet entry'); return; }
+
+    const isNewCustomer = newCustomerToggle.checked;
+    let payload = {
+      timesheetIds: checked.map(c => c.dataset.tsId),
+      jobAddress: document.getElementById('cj-job-address').value,
+      jobDescription: document.getElementById('cj-job-description').value
+    };
+
+    if (isNewCustomer) {
+      const name = document.getElementById('cj-new-name').value.trim();
+      const business = document.getElementById('cj-new-business').value.trim();
+      if (!name && !business) { Toast.show('Enter a customer or business name'); return; }
+      payload.newCustomer = {
+        customerName: name,
+        businessName: business,
+        phone: document.getElementById('cj-new-phone').value,
+        email: document.getElementById('cj-new-email').value
+      };
+    } else {
+      if (!customerSelect.value) { Toast.show('Select a customer, or tick "This is a new customer"'); return; }
+      payload.customerId = customerSelect.value;
+    }
+
+    const submitBtn = document.getElementById('create-job-submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    try {
+      const job = await Api.post('createJobFromTimesheets', payload);
+      Toast.show('Job created from timesheets');
+      showJobDetail(job['Job ID']);
+    } catch (err) {
+      Toast.show('Error: ' + err.message);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Job';
+    }
   });
 }
